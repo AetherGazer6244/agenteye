@@ -96,39 +96,6 @@ public sealed class TrayIconService : IDisposable
     private static extern bool DestroyIcon(nint hIcon);
     [DllImport("user32.dll")]
     private static extern nint LoadCursorW(nint hInst, uint id);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateCompatibleDC(nint dc);
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteDC(nint dc);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateDIBSection(nint dc, ref BITMAPINFO bmi, uint usage,
-        out nint bits, nint section, uint offset);
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteObject(nint obj);
-    [DllImport("gdi32.dll")]
-    private static extern nint SelectObject(nint dc, nint obj);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateSolidBrush(uint color);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreatePen(uint style, uint width, uint color);
-    [DllImport("gdi32.dll")]
-    private static extern bool Rectangle(nint dc, int l, int t, int r, int b);
-    [DllImport("gdi32.dll")]
-    private static extern bool RoundRect(nint dc, int l, int t, int r, int b, int w, int h);
-    [DllImport("gdi32.dll")]
-    private static extern bool SetTextColor(nint dc, uint color);
-    [DllImport("gdi32.dll")]
-    private static extern bool SetBkMode(nint dc, int mode);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateFontW(int height, int width, int esc, int orient,
-        uint weight, uint italic, uint underline, uint strikeout, uint charset,
-        uint outPrecision, uint clipPrecision, uint quality, uint pitchFamily, string face);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateBitmap(int w, int h, uint planes, uint bits, nint data);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern nint CreateIconIndirect(ref ICONINFO info);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int DrawTextW(nint dc, string text, int len, ref RECT rect, uint format);
     [DllImport("user32.dll")]
     private static extern nint CreatePopupMenu();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -140,31 +107,6 @@ public sealed class TrayIconService : IDisposable
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out POINT pt);
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RECT { public int L, T, R, B; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct ICONINFO { public bool Icon; public int X, Y; public nint Mask, Color; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BITMAPINFOHEADER
-    {
-        public uint Size; public int Width, Height; public ushort Planes, BitCount;
-        public uint Compression, SizeImage; public int XPpm, YPpm; public uint ClrUsed, ClrImportant;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BITMAPINFO
-    {
-        public BITMAPINFOHEADER Header;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
-        public uint[] Colors;
-    }
-
-    private const uint DI_NORMAL = 3;
-    private const uint DT_CENTER = 1, DT_VCENTER = 4, DT_SINGLELINE = 0x20;
-    private const uint FW_BOLD = 700;
-    private const uint TRANSPARENT = 1;
     private const uint MF_STRING = 0, MF_SEPARATOR = 0x800;
     private const uint TPM_RIGHTBUTTON = 2, TPM_RETURNCMD = 0x100;
     private const int GWL_EXSTYLE = -20;
@@ -350,99 +292,9 @@ public sealed class TrayIconService : IDisposable
             $"AgentEye — {worst.Name} 已用 {used}%");
     }
 
-    /// <summary>GDI 画 32×32 数字图标(端口自 draw_number_icon)。</summary>
+    /// <summary>托盘图标:应用 A 标 + 数字牌(渲染细节见 TrayIconRenderer)。</summary>
     private nint Draw(string digits)
-    {
-        const int Size = 32;
-        var dc = CreateCompatibleDC(nint.Zero);
-        if (dc == nint.Zero) return nint.Zero;
-        try
-        {
-            var bmi = new BITMAPINFO
-            {
-                Header = new BITMAPINFOHEADER
-                {
-                    Size = (uint)Marshal.SizeOf<BITMAPINFOHEADER>(),
-                    Width = Size,
-                    Height = -Size, // top-down
-                    Planes = 1,
-                    BitCount = 32,
-                    Compression = 0, // BI_RGB
-                },
-                Colors = new uint[2],
-            };
-            var hBmp = CreateDIBSection(dc, ref bmi, 0 /*DIB_RGB_COLORS*/, out var bits,
-                nint.Zero, 0);
-            if (hBmp == nint.Zero || bits == nint.Zero) return nint.Zero;
-            try
-            {
-                // 底色透明清零
-                for (var i = 0; i < Size * Size; i++)
-                    Marshal.WriteInt32(bits, i * 4, 0);
-                var oldBmp = SelectObject(dc, hBmp);
-
-                // ABGR 画圆角底(颜色随紧张度加深,取 Python 版同款)
-                var (bg, fg) = Colors(digits);
-                uint bgAbgr = 0xFF000000 | (uint)((bg.B << 16) | (bg.G << 8) | bg.R);
-                uint fgAbgr = 0xFF000000 | (uint)((fg.B << 16) | (fg.G << 8) | fg.R);
-                var brush = CreateSolidBrush(bgAbgr);
-                var oldBrush = SelectObject(dc, brush);
-                var pen = CreatePen(0, 1, bgAbgr);
-                var oldPen = SelectObject(dc, pen);
-                RoundRect(dc, 0, 0, Size, Size, 9, 9);
-                SelectObject(dc, oldBrush);
-                SelectObject(dc, oldPen);
-                DeleteObject(brush);
-                DeleteObject(pen);
-
-                // 数字
-                SetBkMode(dc, (int)TRANSPARENT);
-                SetTextColor(dc, fgAbgr);
-                var font = CreateFontW(digits.Length > 2 ? 15 : 19, 0, 0, 0, FW_BOLD,
-                    0, 0, 0, 1 /*DEFAULT_CHARSET*/, 0, 0,
-                    4 /*CLEARTYPE_QUALITY*/, 0, "Segoe UI");
-                var oldFont = SelectObject(dc, font);
-                var rect = new RECT { L = 0, T = 0, R = Size, B = Size };
-                DrawTextW(dc, digits, digits.Length, ref rect,
-                    DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-                SelectObject(dc, oldFont);
-                DeleteObject(font);
-                SelectObject(dc, oldBmp);
-
-                // mask:全 0(依赖 alpha 的图标)
-                var hMask = CreateBitmap(Size, Size, 1, 1, nint.Zero);
-                try
-                {
-                    var info = new ICONINFO { Icon = true, X = 0, Y = 0, Mask = hMask, Color = hBmp };
-                    return CreateIconIndirect(ref info);
-                }
-                finally
-                {
-                    DeleteObject(hMask);
-                }
-            }
-            finally
-            {
-                DeleteObject(hBmp);
-            }
-        }
-        finally
-        {
-            DeleteDC(dc);
-        }
-    }
-
-    private static ((int R, int G, int B) Bg, (int R, int G, int B) Fg) Colors(string digits)
-    {
-        // 100(烧完)→ 深红;数字越大底色越深(与 Python 同向)
-        if (digits == "!" || digits == "··")
-            return ((90, 90, 90), (255, 255, 255));
-        if (!int.TryParse(digits, out var used)) used = 0;
-        return used >= 80 ? ((150, 30, 30), (255, 235, 235))
-             : used >= 60 ? ((170, 80, 20), (255, 240, 220))
-             : used >= 30 ? ((40, 100, 60), (225, 250, 235))
-             : ((40, 90, 150), (225, 240, 255));
-    }
+        => TrayIconRenderer.Render(digits, AeAppIcon.IcoPath, TrayIconRenderer.Default);
 
     // ------------------------------------------------------------------
     // 注册/注销

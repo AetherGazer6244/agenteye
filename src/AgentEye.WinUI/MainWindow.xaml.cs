@@ -96,10 +96,24 @@ public sealed partial class MainWindow : Window
         // 限制拖拽范围(最小/最大),避免拖到布局撑不住的极端尺寸
         ApplySizeConstraints();
 
+        // 应用图标(任务栏/标题栏)
+        ApplyAppIcon();
+
         // 几何恢复(ui.x/y/width/height)
         RestoreGeometry();
 
         Closed += (_, _) => OnClosed();
+    }
+
+    /// <summary>把 A 标图标挂到窗口上;失败静默(增强面)。</summary>
+    private void ApplyAppIcon()
+    {
+        try
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            AeAppIcon.Apply(AppWindow, hwnd);
+        }
+        catch { /* 增强面:图标不影响主流程 */ }
     }
 
     /// <summary>给窗口挂 WM_GETMINMAXINFO 子类,限制最小/最大尺寸。</summary>

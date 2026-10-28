@@ -87,6 +87,9 @@ public sealed class WidgetWindow : IDisposable
                 new nint(ex | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE));
         }
 
+        // 应用图标(小组件也用同一份 A 标;失败静默)
+        try { AeAppIcon.Apply(_window.AppWindow, _hwnd); } catch { /* 增强面 */ }
+
         BuildContent();
 
         // 拖动/点击(松手判定,对齐 Python 契约)

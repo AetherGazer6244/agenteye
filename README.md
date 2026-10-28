@@ -10,13 +10,17 @@ Windows 桌面多 Key AI 额度观察工具的 WinUI 3 重写版。与 Python/Tk
   总览页(全部 provider 的余额/百分比行)与设置页(外观 / 告警 / API 管理)。
   玻璃效果依赖系统「设置 → 个性化 → 颜色 → 透明效果」开启;该开关关闭时
   Windows 不渲染 Acrylic,窗口自动退化为不透明底色(系统策略,非缺陷)。
-- 托盘:Shell_NotifyIconW 常驻,图标上 GDI 渲染最紧张 provider 的已用百分比;
+- 托盘:Shell_NotifyIconW 常驻,图标是应用 A 标(按额度紧张度染色:
+  蓝→绿→橙→红)+ 右下角数字牌(最紧张 provider 的已用百分比);
   左键唤起主面板,右键菜单(暂停轮询 / 立即刷新 / 切换小组件 / 退出)。
 - 桌面小组件:无边框置顶 260x64(高度随行数自适应),Acrylic 背板,
   不抢焦点(WS_EX_NOACTIVATE),按住拖动、松手位移 < 4px 判定为点击并
   唤起主面板,位置随关窗落盘。
 - 通知:WinRT AppNotification toast,同一 provider 同一等级 60 分钟冷却,
   升级(黄转红)会重新告警;toast 不可用时降级 MessageBeep。
+- 应用图标:A 标 + 瞳孔(托盘蓝 #285A96),exe / 快捷方式 / 任务栏 / 安装器
+  统一;源文件 `src\AgentEye.WinUI\Assets\AgentEye.ico`,由
+  `tools\make_icon.py` 生成。
 
 ## 构建
 
@@ -34,12 +38,12 @@ dotnet build src\AgentEye.WinUI -c Debug
 dotnet test tests\AgentEye.Core.Tests
 ```
 
-56 个测试覆盖配置层(v2 schema、DPAPI、v1 迁移、损坏隔离)与 provider 层
+105 个测试覆盖配置层(v2 schema、DPAPI、v1 迁移、损坏隔离)与 provider 层
 (探测、6 种适配器、中转站、缓存、告警状态)。
 
 ## 安装
 
-运行 `installer\AgentEye_Setup.exe`(Inno Setup 安装器,lzma2 压缩约 7.6 MB),
+运行 `installer\AgentEye_Setup.exe`(Inno Setup 安装器,lzma2 压缩约 7.9 MB),
 默认装到 `E:\AgentEye`,可选桌面快捷方式与开机自启,自带卸载入口
 (开始菜单 / 系统设置"应用")。当前本机已装好。
 
@@ -74,12 +78,14 @@ src\AgentEye.Core        逻辑层(net8.0,无 UI 依赖)
   Providers\             探测与 6 种 provider 适配器 + 中转站
   Cache\                 models/probe/alert 状态缓存
 src\AgentEye.WinUI       壳层(WinUI 3)
+  Assets\                AgentEye.ico(应用图标,唯一来源)
   Pages\                 OverviewPage / SettingsPage
-  Services\              AeRes / AppServices / PollerService / NotifyService
+  Services\              AeRes / AeAppIcon / AppServices / PollerService / NotifyService
   Styles\                AeStyles.xaml(工程自有样式)
-  Tray\                  托盘(纯 Win32 + GDI)
+  Tray\                  托盘(纯 Win32 + GDI):TrayIconService / TrayIconRenderer
   Widget\                桌面小组件
 tests\AgentEye.Core.Tests
+tools\make_icon.py       图标生成器(Pillow,dev-only,不在构建流程里)
 ```
 
 工程契约(资源取用、XAML 坑、config 兼容)见 `AGENTS.md`;改造执行计划

@@ -4,7 +4,7 @@
 
 Windows 桌面多 Key AI 额度观察工具。UI 采用 Win11 Acrylic 紧凑毛玻璃面板
 (单窗、无导航栏、图标头部),另有两个常驻面:无边框桌面小组件(不抢焦点)
-与托盘图标(图标上 GDI 渲染最紧张 provider 的数字)。
+与托盘图标(GDI 画 A 标数字牌:紧张度染色 + 最紧张 provider 的数字)。
 **只支持 Windows 10 1809+ / Win11**,依赖 DPAPI、WinRT toast 与 WinAppSDK,
 不承诺跨平台。Python/Tkinter 原版只存在于 `main` 与 `feat/glass-redesign`
 的历史里,不再维护。
@@ -25,7 +25,7 @@ Windows 桌面多 Key AI 额度观察工具。UI 采用 Win11 Acrylic 紧凑毛�
 
 ```text
 dotnet build src\AgentEye.WinUI -c Debug -v q --nologo   # 0 error 才算过
-dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 56 passed
+dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 105 passed
 ```
 
 冒烟:启动 exe 7 秒未退出。改 XAML 后必须重构建确认 pass1 没有静默崩。
@@ -33,14 +33,14 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 56 passed
 ## 发布形态
 
 - **框架依赖**(csproj 里 `SelfContained=false` + `WindowsAppSDKSelfContained=false`):
-  产物 41 文件 / 36 MB,运行时用系统装的 .NET 8 Desktop Runtime +
-  Windows App Runtime 1.7。`SatelliteResourceLanguages=zh-Hans;en`
+  产物 40 文件 / 37 MB(含 369 KB 图标资源),运行时用系统装的 .NET 8
+  Desktop Runtime + Windows App Runtime 1.7。`SatelliteResourceLanguages=zh-Hans;en`
   砍掉 83 种语言卫星资源。`RuntimeIdentifier` 必须无条件设 win-x64,
   否则框架依赖发布直接失败。
 - 要自包含版(换机即用,166 MB)得临时改回这两个属性——别长期并存两套。
 - 一键构建 `build.ps1`(项目根,模式对齐 key_note):publish → 剪 pdb →
   `dist\`(便携目录)→ 体积报告 → Inno Setup 出 `installer\AgentEye_Setup.exe`
-  (lzma2 约 7.6 MB)。`build\`、`dist\`、`installer\` 全部 gitignore;
+  (lzma2 约 7.9 MB)。`build\`、`dist\`、`installer\` 全部 gitignore;
   staging 是干净的,config 在 `~\.agenteye` 与安装目录无关,无需备份还原。
 - PS1 含中文**必须带 UTF-8 BOM**(PS5.1 无 BOM 按 GBK 读,中文全串烧)。
 
@@ -96,6 +96,29 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 56 passed
 - 图标字形统一用 Segoe Fluent Icons 码位(E769/E768/E72C/E713/E72B、
   行图标 E99A/E943/E945/E756/E968/E774),不许内嵌图片。
 
+## 图标资源契约
+
+- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(A 标 + 瞳孔,
+  托盘蓝 #285A96),16/20/24/32/40/48/64/128/256 九档、**32bpp BMP
+  条目**(不能改成 PNG 压缩条目——Inno 的 `SetupIconFile` 吃不下)。
+  由 `tools\make_icon.py` 生成(Pillow,dev-only,不在构建流程里);
+  要改样式先改脚本再重生成,别手改 .ico。
+- 同一份文件三处用:csproj `ApplicationIcon` 内嵌进 exe(资源管理器/
+  任务栏/快捷方式/卸载项/toast)+ `Content CopyToOutputDirectory`
+  随输出复制,运行时 `Services\AeAppIcon.cs` 按
+  `AppContext.BaseDirectory\Assets\AgentEye.ico` 定位,用
+  `AppWindow.SetIcon/SetTaskbarIcon/SetTitleBarIcon`,失败退 Win32
+  `WM_SETICON`;全程 try/catch(图标是增强面,挂了不许崩主流程)。
+- **托盘也用这份资源**:`Tray\TrayIconRenderer.cs` 读同一份 ico(纯
+  Win32/GDI,不依赖 WinUI),把 A 标按额度紧张度染色(蓝→绿→橙→红,
+  无数据走灰)+ 右下角白底数字牌;`Layout.Default` 换版式只改这一处。
+  ico 读不到时自动退 `LegacyPlate`(彩色圆角底 + 大数字)。
+- **GDI COLORREF 必须是 `0x00BBGGRR`**:高字节非 0 时 GDI 直接拒画,
+  一个像素都不落——旧托盘代码就是栽在这(`0xFF000000 | ...`),
+  托盘图标一直是空的,别再写错。
+- 上面的「图标字形用 Segoe Fluent Icons」只约束**界面内按钮**,
+  不含 app 级 .ico 资源。
+
 ## 中文文件
 
 含中文的文件一律用编辑器工具(Read/Write/Edit)读写;PowerShell 5.1 的
@@ -119,8 +142,8 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 56 passed
 
 ## 增强面降级
 
-托盘(`TrayIconService`,Shell_NotifyIconW + GDI 数字图标,配色硬编码是
-设计决定勿改)与小组件(`WidgetWindow`,WS_EX_NOACTIVATE|TOOLWINDOW)
+托盘(`TrayIconService`,Shell_NotifyIconW + `TrayIconRenderer` 画的
+A 标数字牌)与小组件(`WidgetWindow`,WS_EX_NOACTIVATE|TOOLWINDOW)
 都是增强面:任何 Win32/WinRT 步骤失败只能静默降级,不许把主流程带崩。
 `DesktopAcrylicBackdrop` 在老系统上可能抛异常,赋值处必须 try/catch。
 系统「透明效果」关闭时(注册表 `EnableTransparency=0`)Windows 一律不渲染

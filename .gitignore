@@ -15,3 +15,6 @@ installer/
 
 # 个人文件,永不提交
 2026.10.1 7 reverse.txt
+
+# make_icon.py --preview 的产物
+icon_preview*.png

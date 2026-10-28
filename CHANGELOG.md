@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-10-28 — 应用图标:A 标 + 瞳孔(全量接入)
+
+### 新增
+
+- 唯一图标源 `src\AgentEye.WinUI\Assets\AgentEye.ico`:几何 A 标 + 瞳孔
+  (托盘蓝 #285A96 / 亮蓝瞳孔),16~256 九档 **32bpp BMP 条目**;
+  由 `tools\make_icon.py` 生成(Pillow,dev-only,不在构建流程里),
+  ≤24px 走"光学尺寸"变体(腿更粗)防糊
+- csproj `ApplicationIcon` 内嵌进 exe:资源管理器 / 任务栏 / 快捷方式 /
+  卸载项 / toast 图标全部统一
+- 运行时 `Services\AeAppIcon.cs`:`AppWindow.SetIcon/SetTaskbarIcon/
+  SetTitleBarIcon`(WinAppSDK 1.7),失败退 Win32 `WM_SETICON`;
+  主窗口与桌面小组件各挂一次
+- **托盘换成同一份 A 标**:新增 `Tray\TrayIconRenderer.cs`(纯 Win32/GDI,
+  不依赖 WinUI)——A 标按额度紧张度染色(蓝→绿→橙→红,无数据走灰)+
+  右下角白底数字牌(深色数字 + 状态色描边);ico 读不到时自动退旧样式
+  (彩色圆角底 + 大数字)
+- **顺带修掉旧托盘的老 bug**:旧代码用 `0xFF000000 | ...` 拼 COLORREF,
+  高字节非 0 时 GDI 直接拒画(一个像素都不落)——**托盘图标一直是空的**;
+  新代码统一 `0x00BBGGRR`,并修了 `CreateFontW` 少 `CharSet.Unicode`
+  导致字体名不生效的问题
+- Inno `SetupIconFile`:安装器图标换成同一份 A 标
+- 界面内图标字形仍走 Segoe Fluent Icons,标题栏圆点不动(契约不变)
+
+### 说明
+
+- 托盘数字仍保留(数字牌),tooltip 语义不变;想只要图标不要数字牌改
+  `TrayIconRenderer.Default` 一个常量即可
+- 产物 40 文件 / 37 MB(多 369 KB 图标),安装器 7.9 MB;测试基线 105/105
+
 ## 2026-10-22 — dist/installer 形态对齐 key_note + 更新改静默安装(feat/winui-acrylic)
 
 ### 变更

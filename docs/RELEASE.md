@@ -41,7 +41,7 @@ AgentEye-<任意版本>-Setup.exe   ← 也接受
 
 `AgentEye_Setup.exe` 由 Inno Setup 6 打包(`AgentEye_Setup.iss`),里面是
 **完整的框架依赖发布目录**(运行时用系统装的 .NET 8 Desktop Runtime +
-Windows App Runtime 1.7)。lzma2/max 压缩后约 **7.6 MB**。
+Windows App Runtime 1.7)。lzma2/max 压缩后约 **7.9 MB**。
 
 打包方式(两种等价,推荐第一种):
 

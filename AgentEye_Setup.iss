@@ -21,6 +21,8 @@ MinVersion=10.0.19041
 DefaultGroupName=AgentEye
 OutputDir=installer
 OutputBaseFilename=AgentEye_Setup
+; 安装器图标:与 exe 同一份 A 标(必须是 32bpp BMP 格式条目的 .ico,不能是 PNG 压缩)
+SetupIconFile=src\AgentEye.WinUI\Assets\AgentEye.ico
 Compression=lzma2/max
 SolidCompression=yes
 UninstallDisplayIcon={app}\AgentEye.exe
