@@ -242,29 +242,11 @@ public sealed partial class MainWindow : Window
 
     // ---------------- 头部图标按钮 ----------------
 
-    private void BtnPause_Click(object sender, RoutedEventArgs e)
-    {
-        var paused = _app.Poller.ToggleGlobalPause();
-        if (!paused) _ = _app.Poller.RefreshNowAsync();
-        SyncPauseGlyph();
-    }
-
-    private void BtnRefresh_Click(object sender, RoutedEventArgs e)
-        => _ = _app.Poller.RefreshNowAsync();
-
     private void BtnSettings_Click(object sender, RoutedEventArgs e)
         => ShowPage("settings");
 
     private void BtnBack_Click(object sender, RoutedEventArgs e)
         => ShowPage("overview");
-
-    /// <summary>暂停按钮字形/提示随全局暂停态切换(托盘切了也要跟上)。</summary>
-    public void SyncPauseGlyph() => DispatcherQueue.TryEnqueue(() =>
-    {
-        var paused = _app.Poller.IsGloballyPaused;
-        PauseIcon.Glyph = paused ? "\uE768" : "\uE769";
-        ToolTipService.SetToolTip(BtnPause, paused ? "恢复轮询" : "暂停轮询");
-    });
 
     /// <summary>托盘/外部入口:封送 UI 线程后进设置页。</summary>
     public void GoSettings() => DispatcherQueue.TryEnqueue(() => ShowPage("settings"));

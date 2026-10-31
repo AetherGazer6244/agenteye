@@ -95,7 +95,7 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 - 头部图标按钮是 32×32、透明底、圆角 6 的 `Button` + `FontIcon`;
   按钮区右侧留白 = `AppWindow.TitleBar.RightInset / RasterizationScale`
   (物理像素换算 DIP),别硬编码。
-- 图标字形统一用 Segoe Fluent Icons 码位(E769/E768/E72C/E713/E72B、
+- 图标字形统一用 Segoe Fluent Icons 码位(E713/E72B、
   行图标 E99A/E943/E945/E756/E968/E774),不许内嵌图片。
 
 ## 图标资源契约

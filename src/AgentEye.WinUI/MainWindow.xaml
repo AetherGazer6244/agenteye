@@ -42,17 +42,6 @@
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
                               FontSize="14" Glyph="&#xE72B;" />
                 </Button>
-                <Button x:Name="BtnPause" Style="{StaticResource AeIconButtonStyle}"
-                        Click="BtnPause_Click" ToolTipService.ToolTip="暂停轮询">
-                    <FontIcon x:Name="PauseIcon"
-                              FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                              FontSize="14" Glyph="&#xE769;" />
-                </Button>
-                <Button x:Name="BtnRefresh" Style="{StaticResource AeIconButtonStyle}"
-                        Click="BtnRefresh_Click" ToolTipService.ToolTip="立即刷新">
-                    <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                              FontSize="14" Glyph="&#xE72C;" />
-                </Button>
                 <Button x:Name="BtnSettings" Style="{StaticResource AeIconButtonStyle}"
                         Click="BtnSettings_Click" ToolTipService.ToolTip="设置">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"

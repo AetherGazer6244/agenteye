@@ -3,7 +3,7 @@
 Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 紧凑面板 +
 托盘常驻 + 桌面小组件,盯着各平台 API 额度,快烧完时提前告警。
 
-![version](https://img.shields.io/badge/version-v1.2.1-blue)
+![version](https://img.shields.io/badge/version-v1.2.2-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B%20%2F%2011-blueviolet)
 ![runtime](https://img.shields.io/badge/runtime-.NET%208%20%2B%20WinAppSDK%201.7-5C2D91)
 
@@ -28,7 +28,7 @@ Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 
   (系统策略,非缺陷)。
 - **托盘常驻**:Shell_NotifyIconW + 纯 GDI 渲染的应用 A 标,按额度紧张度
   染色(蓝→绿→橙→红,无数据走灰)+ 右下角数字牌(最紧张 provider 的已用
-  百分比)。左键唤起主面板,右键菜单(暂停轮询 / 立即刷新 / 切换小组件 / 退出)。
+  百分比)。左键唤起主面板,右键菜单(打开主面板 / 切换小组件 / 设置 / 退出)。
 - **桌面小组件**:无边框置顶 260×64(高度随行数自适应),Acrylic 背板,
   不抢焦点(WS_EX_NOACTIVATE);按住拖动、松手位移 < 4px 判定为点击并唤起
   主面板,位置落盘记忆。
