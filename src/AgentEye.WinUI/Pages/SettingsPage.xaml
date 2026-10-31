@@ -127,33 +127,36 @@
                                       VerticalAlignment="Center"
                                       Toggled="AlertToggle_Changed" />
                     </Grid>
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="剩余百分比 ≤"
-                                   VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <muxc:NumberBox x:Name="WarnPctBox" Grid.Column="1" MinWidth="90"
-                                        Minimum="0" Maximum="100"
-                                        SpinButtonPlacementMode="Compact"
-                                        ValueChanged="AlertNum_Changed" />
-                        <TextBlock Grid.Column="2" Text="% 记为黄" VerticalAlignment="Center" />
-                    </Grid>
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="剩余额度 ≤"
-                                   VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <muxc:NumberBox x:Name="CriticalYuanBox" Grid.Column="1" MinWidth="90"
-                                        Minimum="0" SpinButtonPlacementMode="Compact"
-                                        ValueChanged="AlertNum_Changed" />
-                        <TextBlock Grid.Column="2" Text="元 记为红" VerticalAlignment="Center" />
-                    </Grid>
+                    <!-- 阈值行:告警关时整层收纳,开时展开(初态跟 alert.enable) -->
+                    <StackPanel x:Name="AlertThresholds" Spacing="10" Visibility="Collapsed">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="剩余百分比 ≤"
+                                       VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <muxc:NumberBox x:Name="WarnPctBox" Grid.Column="1" MinWidth="90"
+                                            Minimum="0" Maximum="100"
+                                            SpinButtonPlacementMode="Compact"
+                                            ValueChanged="AlertNum_Changed" />
+                            <TextBlock Grid.Column="2" Text="% 记为黄" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="剩余额度 ≤"
+                                       VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <muxc:NumberBox x:Name="CriticalYuanBox" Grid.Column="1" MinWidth="90"
+                                            Minimum="0" SpinButtonPlacementMode="Compact"
+                                            ValueChanged="AlertNum_Changed" />
+                            <TextBlock Grid.Column="2" Text="元 记为红" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

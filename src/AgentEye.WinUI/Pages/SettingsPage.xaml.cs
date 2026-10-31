@@ -119,6 +119,7 @@ public sealed partial class SettingsPage : UserControl
 
             var alert = _app.AlertDict();
             AlertEnable.IsOn = alert.TryGetValue("enable", out var en) && en is true;
+            SyncAlertThresholds();
             WarnPctBox.Value = alert.TryGetValue("warn_pct", out var w) ? Convert.ToDouble(w) : 30;
             CriticalYuanBox.Value = alert.TryGetValue("critical_amount_yuan", out var c)
                 ? Convert.ToDouble(c) : 5.0;
@@ -327,9 +328,16 @@ public sealed partial class SettingsPage : UserControl
 
     private void AlertToggle_Changed(object sender, RoutedEventArgs e)
     {
+        SyncAlertThresholds();
         if (_loading) return;
         ApplyAlert();
     }
+
+    /// <summary>阈值行随开关收纳/展开(初态跟 cfg,切换即时跟随)。</summary>
+    private void SyncAlertThresholds()
+        => AlertThresholds.Visibility = AlertEnable.IsOn
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
     private void AlertNum_Changed(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
