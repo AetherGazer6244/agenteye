@@ -65,6 +65,29 @@ public sealed class ConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Template_Ui_HasHotkeyAutostartLanguageDefaults()
+    {
+        var outcome = _store.LoadV2();
+        var ui = Assert.IsType<Dictionary<string, object?>>(outcome.Config["ui"]);
+        Assert.Equal("Ctrl+Shift+A", ui["hotkey"]);
+        Assert.Equal(true, ui["hotkey_enabled"]);
+        Assert.Equal(false, ui["autostart"]);
+        Assert.Equal("zh-Hans", ui["language"]);
+    }
+
+    [Fact]
+    public void LoadV2_UserHotkey_OverridesTemplate()
+    {
+        File.WriteAllText(_path, """{"schema_version":2,"ui":{"hotkey":"Ctrl+Alt+U"}}""");
+        var outcome = _store.LoadV2();
+        var ui = Assert.IsType<Dictionary<string, object?>>(outcome.Config["ui"]);
+        Assert.Equal("Ctrl+Alt+U", ui["hotkey"]);
+        // 模板里没写的键仍取默认值
+        Assert.Equal(true, ui["hotkey_enabled"]);
+        Assert.Equal("zh-Hans", ui["language"]);
+    }
+
+    [Fact]
     public void SaveV2_EncryptsOnDisk_KeepsPlaintextInMemory()
     {
         var cfg = V2WithKey();

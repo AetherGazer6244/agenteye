@@ -17,4 +17,41 @@
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Margin" Value="0,8,0,4" />
     </Style>
+
+    <!-- 设置页:分节大标题(Windows 11 设置风格) -->
+    <Style x:Key="AeSectionHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,14,0,8" />
+    </Style>
+
+    <!-- 设置页:一条功能 = 圆角卡片(图标 + 标题/副标题 + 右侧控件) -->
+    <Style x:Key="AeSettingsItemStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource AeCardBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AeCardStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="14,12" />
+    </Style>
+
+    <Style x:Key="AeSettingsItemTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource AeTextPrimaryBrush}" />
+    </Style>
+
+    <Style x:Key="AeSettingsItemSubtitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource AeTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="MaxLines" Value="2" />
+    </Style>
+
+    <!-- 卡片行左侧的 Segoe Fluent Icons 字形 -->
+    <Style x:Key="AeSettingsIconStyle" TargetType="FontIcon">
+        <Setter Property="FontFamily" Value="{ThemeResource SymbolThemeFontFamily}" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource AeTextSecondaryBrush}" />
+    </Style>
 </ResourceDictionary>

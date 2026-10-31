@@ -1,3 +1,4 @@
+using AgentEye.WinUI.Services;
 using Microsoft.UI.Xaml;
 
 namespace AgentEye;
@@ -18,5 +19,8 @@ public partial class App : Application
     {
         _window = new MainWindow();
         _window.Activate();
+        // 开机自启带 --minimized:静默进托盘,不弹主面板
+        if (StartupService.HasMinimizedFlag() && _window is MainWindow main)
+            main.HidePanel();
     }
 }
