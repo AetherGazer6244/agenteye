@@ -79,6 +79,13 @@ public static class L
         ["form.modelPlaceholder"] = "如 deepseek-chat;额度端点不可用时用真实对话探测",
         ["form.save"] = "保存",
         ["form.cancel"] = "取消",
+        ["form.test"] = "测试",
+        ["form.testing"] = "测试中…",
+        ["form.testOk"] = "测试通过:{0}",
+        ["form.testFail"] = "测试失败:{0}",
+        ["form.modelsLoaded"] = "已拉到 {0} 个模型",
+        ["pt.ok"] = "key 有效",
+        ["pt.err"] = "测试异常:{0}",
 
         // —— provider 类型名 ——
         ["kind.deepseek"] = "DeepSeek",
@@ -386,6 +393,13 @@ public static class L
         ["form.modelPlaceholder"] = "e.g. deepseek-chat; used as a live probe when the quota endpoint is unavailable",
         ["form.save"] = "Save",
         ["form.cancel"] = "Cancel",
+        ["form.test"] = "Test",
+        ["form.testing"] = "Testing…",
+        ["form.testOk"] = "Test passed: {0}",
+        ["form.testFail"] = "Test failed: {0}",
+        ["form.modelsLoaded"] = "{0} models loaded",
+        ["pt.ok"] = "Key works",
+        ["pt.err"] = "Test error: {0}",
 
         // —— provider kind names ——
         ["kind.deepseek"] = "DeepSeek",

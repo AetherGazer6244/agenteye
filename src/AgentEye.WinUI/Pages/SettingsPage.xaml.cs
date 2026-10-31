@@ -41,6 +41,7 @@ public sealed partial class SettingsPage : UserControl
     private readonly MainWindow _main;
     private Dictionary<string, object?>? _editing; // 非 null = 编辑模式
     private bool _loading;                          // 回显期间不触发保存
+    private bool _testing;                          // 「测试」进行中,防重入
     private CancellationTokenSource? _sizeDebounce;
 
     private readonly List<ThemeOption> _themeOptions =
@@ -105,6 +106,7 @@ public sealed partial class SettingsPage : UserControl
         FModel.PlaceholderText = L.T("form.modelPlaceholder");
         TxtKindLabel.Text = L.T("form.kindLabel");
         FBaseUrl.PlaceholderText = L.T("form.urlPlaceholder");
+        BtnTest.Content = L.T("form.test");
         BtnSave.Content = L.T("form.save");
         BtnCancel.Content = L.T("form.cancel");
         SecAdv.Text = L.T("sec.adv");
@@ -665,6 +667,7 @@ public sealed partial class SettingsPage : UserControl
         ListPane.Visibility = Visibility.Collapsed;
         FormPane.Visibility = Visibility.Visible;
         FormError.Visibility = Visibility.Collapsed;
+        FormResult.Visibility = Visibility.Collapsed;
     }
 
     private void ShowListPane()
@@ -680,6 +683,7 @@ public sealed partial class SettingsPage : UserControl
         FBaseUrl.Text = "";
         FKey.Text = "";
         FModel.Text = "";
+        FModel.ItemsSource = null;
     }
 
     private void LoadForm(Dictionary<string, object?> p)
@@ -703,6 +707,7 @@ public sealed partial class SettingsPage : UserControl
             _loading = false;
         }
         FormDetect.Visibility = Visibility.Collapsed;
+        FormResult.Visibility = Visibility.Collapsed;
     }
 
     private void ShowFormError(string? msg)
@@ -764,6 +769,65 @@ public sealed partial class SettingsPage : UserControl
         var d = Detect.Run(key: key, hintUrl: baseUrl);
         FormDetect.Text = L.F("form.detect", KindLabel(d.Kind), d.Notes);
         FormDetect.Visibility = Visibility.Visible;
+    }
+
+    // ------------------------------------------------------------------
+    // 测试 Key:表单当前值跑一次真实拉取(不落盘),顺带填充模型下拉
+    // ------------------------------------------------------------------
+
+    private async void BtnTest_Click(object sender, RoutedEventArgs e)
+    {
+        if (_testing) return;
+        var baseUrl = FBaseUrl.Text.Trim();
+        var key = FKey.Text.Trim();
+        var model = FModel.Text.Trim();
+        var kind = SelectedKind.Length > 0 ? SelectedKind
+            : Detect.Run(key: key, hintUrl: baseUrl).Kind;
+        if (baseUrl.Length == 0 && !OfficialKinds.Contains(kind))
+        {
+            ShowFormError(L.T("form.errEmptyUrl"));
+            return;
+        }
+
+        _testing = true;
+        BtnTest.IsEnabled = false;
+        BtnSave.IsEnabled = false;
+        ShowFormResult(null, L.T("form.testing"));
+        try
+        {
+            var outcome = await ProviderTest.RunAsync(kind, baseUrl, key, model);
+            var line = L.F(outcome.Ok ? "form.testOk" : "form.testFail", outcome.Message);
+            if (outcome.Models.Count > 0)
+            {
+                FillModelCombo(outcome.Models);
+                line += " · " + L.F("form.modelsLoaded", outcome.Models.Count);
+            }
+            ShowFormResult(outcome.Ok, line);
+        }
+        finally
+        {
+            _testing = false;
+            BtnTest.IsEnabled = true;
+            BtnSave.IsEnabled = true;
+        }
+    }
+
+    /// <summary>结果行:null=中性(进行中),true=绿,false=红(等级色均主题无关,直引安全)。</summary>
+    private void ShowFormResult(bool? ok, string msg)
+    {
+        FormResult.Foreground = ok is { } flagged
+            ? AeRes.Brush(this, flagged ? "AeOkBrush" : "AeErrorBrush")
+            : AeRes.Brush(this, "AeTextSecondaryBrush");
+        FormResult.Text = msg;
+        FormResult.Visibility = msg.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>模型下拉填充:保留用户已输入/已选的值。</summary>
+    private void FillModelCombo(IReadOnlyList<string> models)
+    {
+        var current = FModel.Text;
+        FModel.ItemsSource = models;
+        FModel.Text = current;
     }
 
     private async void BtnSave_Click(object sender, RoutedEventArgs e)

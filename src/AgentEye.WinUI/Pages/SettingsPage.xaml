@@ -204,6 +204,7 @@
 
                             <TextBlock x:Name="TxtKindLabel" VerticalAlignment="Center" />
                             <ComboBox x:Name="FKind" Grid.Column="1" MinWidth="120"
+                                      DisplayMemberPath="Text"
                                       HorizontalAlignment="Left"
                                       SelectionChanged="FKind_SelectionChanged" />
                             <TextBlock Text="Base URL" Grid.Row="1" VerticalAlignment="Center" />
@@ -213,13 +214,17 @@
                             <TextBox x:Name="FKey" Grid.Row="2" Grid.Column="1"
                                      LostFocus="FKey_LostFocus" />
                             <TextBlock Text="Model" Grid.Row="3" VerticalAlignment="Center" />
-                            <TextBox x:Name="FModel" Grid.Row="3" Grid.Column="1" />
+                            <ComboBox x:Name="FModel" Grid.Row="3" Grid.Column="1"
+                                      IsEditable="True" />
                         </Grid>
                         <TextBlock x:Name="FormDetect" Foreground="{StaticResource AeTextSecondaryBrush}"
                                    Visibility="Collapsed" TextWrapping="Wrap" />
                         <TextBlock x:Name="FormError" Foreground="{StaticResource AeErrorBrush}"
                                    Visibility="Collapsed" TextWrapping="Wrap" />
+                        <TextBlock x:Name="FormResult" Foreground="{StaticResource AeTextSecondaryBrush}"
+                                   Visibility="Collapsed" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="BtnTest" Click="BtnTest_Click" />
                             <Button Style="{StaticResource AccentButtonStyle}"
                                     x:Name="BtnSave" Click="BtnSave_Click" />
                             <Button x:Name="BtnCancel" Click="BtnCancel_Click" />
