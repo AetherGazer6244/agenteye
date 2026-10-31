@@ -1,3 +1,5 @@
+using AgentEye.Core.Config;
+using AgentEye.Core.Localization;
 using AgentEye.WinUI.Services;
 using Microsoft.UI.Xaml;
 
@@ -12,6 +14,23 @@ public partial class App : Application
 
     public App()
     {
+        // 语言在装配期一次定型(重启生效)。unpackaged 下 MRT 的
+        // PrimaryLanguageOverride 不可用(unpackaged 抛 InvalidOperationException),
+        // 所以双语不走 resw/x:Uid——XAML 文本全部由代码回填 L.T。
+        try
+        {
+            var outcome = new ConfigStore().LoadV2();
+            var lang = outcome.Config.TryGetValue("ui", out var u) &&
+                       u is Dictionary<string, object?> ui &&
+                       ui.TryGetValue("language", out var l) && l is string ls && ls.Length > 0
+                ? ls : "zh-Hans";
+            L.Init(lang);
+        }
+        catch
+        {
+            // 配置读不了按默认语言
+            L.Init("zh-Hans");
+        }
         InitializeComponent();
     }
 

@@ -1,3 +1,4 @@
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.WinUI.Services;
 using Microsoft.UI.Xaml;
@@ -22,6 +23,11 @@ public sealed partial class OverviewPage : UserControl
         InitializeComponent();
         _app = app;
         _main = main;
+        // 静态文案回填(语言启动定型,重启生效)
+        TxtOverviewTitle.Text = L.T("ov.title");
+        TxtEmpty.Text = L.T("ov.empty");
+        BtnOpenSettings.Content = L.T("ov.openSettings");
+        FooterUpdated.Text = L.T("ov.notRefreshed");
         Loaded += (_, _) =>
         {
             _app.ResultsChanged += OnResultsChanged;

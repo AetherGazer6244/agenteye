@@ -1,5 +1,6 @@
 using AgentEye.Core.Config;
 using AgentEye.Core.Hotkeys;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.Core.Update;
 using AgentEye.WinUI.Services;
@@ -7,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Windows.System;
 
@@ -43,20 +45,71 @@ public sealed partial class SettingsPage : UserControl
 
     private readonly List<ThemeOption> _themeOptions =
     [
-        new("跟随系统", "auto"),
-        new("浅色", "light"),
-        new("深色", "dark"),
+        new(L.T("theme.auto"), "auto"),
+        new(L.T("theme.light"), "light"),
+        new(L.T("theme.dark"), "dark"),
     ];
 
-    // 1.2.1 只落库不切换;中英双语自 1.3.0 起生效
+    // 语言项用各自语言的自称(简体中文 / English),不需翻译
     private readonly List<LanguageOption> _languageOptions =
     [
         new("简体中文", "zh-Hans"),
+        new("English", "en"),
     ];
+
+    /// <summary>静态文案回填(语言启动定型,重启生效;unpackaged 无 resw 可用)。</summary>
+    private void ApplyStrings()
+    {
+        SecAppearance.Text = L.T("sec.appearance");
+        TxtThemeTitle.Text = L.T("theme.title");
+        TxtThemeSub.Text = L.T("theme.subtitle");
+        TxtAutostartTitle.Text = L.T("autostart.title");
+        TxtAutostartSub.Text = L.T("autostart.subtitle");
+        AutostartSwitch.OnContent = L.T("autostart.on");
+        AutostartSwitch.OffContent = L.T("autostart.off");
+        TxtLangTitle.Text = L.T("lang.title");
+        TxtLangSub.Text = L.T("lang.subtitle");
+        SecHotkey.Text = L.T("sec.hotkey");
+        TxtHotkeyTitle.Text = L.T("hotkey.title");
+        TxtHotkeySub.Text = L.T("hotkey.subtitle");
+        BtnClearHotkey.Content = L.T("hotkey.clear");
+        SecAlert.Text = L.T("sec.alert");
+        TxtAlertTitle.Text = L.T("alert.title");
+        TxtAlertSub.Text = L.T("alert.subtitle");
+        AlertEnable.OnContent = L.T("alert.on");
+        AlertEnable.OffContent = L.T("alert.off");
+        TxtWarnPct.Text = L.T("alert.warnPct");
+        TxtWarnPctSuffix.Text = L.T("alert.warnPctSuffix");
+        TxtCritAmount.Text = L.T("alert.critAmount");
+        TxtCritSuffix.Text = L.T("alert.critSuffix");
+        SecApi.Text = L.T("sec.api");
+        TxtKeysLabel.Text = L.T("api.keysLabel");
+        BtnAddKey.Content = L.T("api.addKey");
+        BtnEdit.Content = L.T("api.edit");
+        BtnDelete.Content = L.T("api.delete");
+        FKey.PlaceholderText = L.T("form.keyPlaceholder");
+        FModel.PlaceholderText = L.T("form.modelPlaceholder");
+        BtnSave.Content = L.T("form.save");
+        BtnCancel.Content = L.T("form.cancel");
+        SecAdv.Text = L.T("sec.adv");
+        TxtSizeTitle.Text = L.T("adv.sizeTitle");
+        TxtSizeSub.Text = L.T("adv.sizeSubtitle");
+        TxtWidthLabel.Text = L.T("adv.width");
+        TxtHeightLabel.Text = L.T("adv.height");
+        BtnResetSize.Content = L.T("adv.resetSize");
+        SecAbout.Text = L.T("sec.about");
+        TxtAboutTitle.Text = L.T("about.title");
+        TxtAboutSub.Text = L.T("about.subtitle");
+        BtnAboutDetails.Content = L.T("about.details");
+        BtnCheckUpdate.Content = L.T("update.check");
+        BtnDownloadUpdate.Content = L.T("update.download");
+        BtnIgnoreUpdate.Content = L.T("update.ignore");
+    }
 
     public SettingsPage(AppServices app, MainWindow main)
     {
         InitializeComponent();
+        ApplyStrings();
         _app = app;
         _main = main;
         ThemeCombo.ItemsSource = _themeOptions;
@@ -113,7 +166,8 @@ public sealed partial class SettingsPage : UserControl
         {
             ThemeCombo.SelectedIndex = Math.Max(0, _themeOptions.FindIndex(o => o.Value == _app.ThemeChoice));
             AutostartSwitch.IsOn = StartupService.IsEnabled();
-            LanguageCombo.SelectedIndex = 0;
+            LanguageCombo.SelectedIndex = Math.Max(0,
+                _languageOptions.FindIndex(o => o.Value == _app.Language));
 
             HotkeyBox.Text = _app.HotkeyText;
 
@@ -175,7 +229,7 @@ public sealed partial class SettingsPage : UserControl
     }
 
     // ------------------------------------------------------------------
-    // 语言(1.2.1 先落库,中英双语 1.3.0 起可切)
+    // 语言(1.3.0 起中英可切;重启生效——整套文案在启动时一次定型)
     // ------------------------------------------------------------------
 
     private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -183,8 +237,51 @@ public sealed partial class SettingsPage : UserControl
         if (_loading) return;
         if (LanguageCombo.SelectedIndex < 0) return;
         var lang = _languageOptions[LanguageCombo.SelectedIndex].Value;
+        if (lang == _app.Language) return;
         _app.SetLanguage(lang);
         _app.TrySaveCfg();
+        _ = ShowRestartDialogAsync();
+    }
+
+    /// <summary>语言切换提示:重启生效,可立即重启(增强面:失败静默回提示)。</summary>
+    private async Task ShowRestartDialogAsync()
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = L.T("lang.saved"),
+                Content = new TextBlock
+                {
+                    Text = L.T("lang.restart.msg"),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                PrimaryButtonText = L.T("lang.restart.now"),
+                CloseButtonText = L.T("common.close"),
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary) RestartApp();
+        }
+        catch
+        {
+            // 弹不出来(无 XamlRoot 等):设置已保存,用户下次重启自然生效
+        }
+    }
+
+    private void RestartApp()
+    {
+        try
+        {
+            var exe = Path.Combine(AppContext.BaseDirectory, "AgentEye.exe");
+            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
+            Application.Current.Exit();
+        }
+        catch
+        {
+            _ = ShowErrorAsync(L.T("common.error"), L.T("app.restartFailed"));
+        }
     }
 
     // ------------------------------------------------------------------

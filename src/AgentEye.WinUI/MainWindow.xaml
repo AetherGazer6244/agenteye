@@ -1,4 +1,4 @@
-<Window
+﻿<Window
     x:Class="AgentEye.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -37,13 +37,12 @@
             <StackPanel x:Name="HeaderButtons" Grid.Column="1" Orientation="Horizontal"
                         VerticalAlignment="Center" HorizontalAlignment="Right">
                 <Button x:Name="BtnBack" Style="{StaticResource AeIconButtonStyle}"
-                        Click="BtnBack_Click" Visibility="Collapsed"
-                        ToolTipService.ToolTip="返回总览">
+                        Click="BtnBack_Click" Visibility="Collapsed">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
                               FontSize="14" Glyph="&#xE72B;" />
                 </Button>
                 <Button x:Name="BtnSettings" Style="{StaticResource AeIconButtonStyle}"
-                        Click="BtnSettings_Click" ToolTipService.ToolTip="设置">
+                        Click="BtnSettings_Click">
                     <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
                               FontSize="14" Glyph="&#xE713;" />
                 </Button>

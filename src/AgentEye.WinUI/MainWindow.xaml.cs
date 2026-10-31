@@ -1,3 +1,4 @@
+using AgentEye.Core.Localization;
 using AgentEye.WinUI.Pages;
 using AgentEye.WinUI.Services;
 using AgentEye.WinUI.Tray;
@@ -89,7 +90,11 @@ public sealed partial class MainWindow : Window
 
     public MainWindow()
     {
+        // 语言定型已在 App ctor(资源系统初始化前)完成,这里直接进 UI 装配
         InitializeComponent();
+        // 头部按钮 tooltip(语言启动定型,重启生效)
+        ToolTipService.SetToolTip(BtnBack, L.T("win.backTooltip"));
+        ToolTipService.SetToolTip(BtnSettings, L.T("win.settingsTooltip"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
