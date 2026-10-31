@@ -58,6 +58,10 @@ public sealed class ConfigStore
             ["generic_openai"] = "",
         };
 
+    /// <summary>官方端点的默认 base_url(拉取层对空 URL 有 fallback);没有则空串。</summary>
+    public static string DefaultBaseUrl(string kind) =>
+        DefaultBaseUrls.TryGetValue(kind, out var url) ? url : "";
+
     // 顺序即优先级:api_key → token → key(与 Python 元组一致)
     private static readonly string[] V1EntryKeyFields = ["api_key", "token", "key"];
     private static readonly string[] V1LiftedFields = ["name", "base_url"];

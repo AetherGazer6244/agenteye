@@ -71,10 +71,21 @@ public static class L
         ["api.addKey"] = "添加 Key",
         ["api.edit"] = "编辑",
         ["api.delete"] = "删除",
+        ["form.kindLabel"] = "类型",
+        ["form.kindAuto"] = "自动识别",
+        ["form.urlPlaceholder"] = "官方端点可留空;中转站填完整 URL",
+        ["form.detect"] = "识别:{0} — {1}",
         ["form.keyPlaceholder"] = "粘贴 key;留空则沿用已存 key",
         ["form.modelPlaceholder"] = "如 deepseek-chat;额度端点不可用时用真实对话探测",
         ["form.save"] = "保存",
         ["form.cancel"] = "取消",
+
+        // —— provider 类型名 ——
+        ["kind.deepseek"] = "DeepSeek",
+        ["kind.zhipu"] = "智谱 GLM",
+        ["kind.minimax"] = "MiniMax",
+        ["kind.opencode_go"] = "OpenCode Go",
+        ["kind.generic_openai"] = "通用 OpenAI 兼容",
 
         // —— 设置页:高级 ——
         ["adv.sizeTitle"] = "主窗口面板大小",
@@ -367,10 +378,21 @@ public static class L
         ["api.addKey"] = "Add key",
         ["api.edit"] = "Edit",
         ["api.delete"] = "Delete",
+        ["form.kindLabel"] = "Type",
+        ["form.kindAuto"] = "Auto-detect",
+        ["form.urlPlaceholder"] = "Leave empty for official endpoints; full URL for relays",
+        ["form.detect"] = "Detected: {0} — {1}",
         ["form.keyPlaceholder"] = "Paste key; leave empty to keep the stored one",
         ["form.modelPlaceholder"] = "e.g. deepseek-chat; used as a live probe when the quota endpoint is unavailable",
         ["form.save"] = "Save",
         ["form.cancel"] = "Cancel",
+
+        // —— provider kind names ——
+        ["kind.deepseek"] = "DeepSeek",
+        ["kind.zhipu"] = "Zhipu GLM",
+        ["kind.minimax"] = "MiniMax",
+        ["kind.opencode_go"] = "OpenCode Go",
+        ["kind.generic_openai"] = "Generic OpenAI-compatible",
 
         // —— Settings: advanced ——
         ["adv.sizeTitle"] = "Panel size",

@@ -57,6 +57,20 @@ public sealed partial class SettingsPage : UserControl
         new("English", "en"),
     ];
 
+    // 空串 = 自动识别(保存时走 Detect);具体 kind 由保存时定死
+    private readonly List<KindOption> _kindOptions =
+    [
+        new(L.T("form.kindAuto"), ""),
+        new(L.T("kind.deepseek"), "deepseek"),
+        new(L.T("kind.zhipu"), "zhipu"),
+        new(L.T("kind.minimax"), "minimax"),
+        new(L.T("kind.opencode_go"), "opencode_go"),
+        new(L.T("kind.generic_openai"), "generic_openai"),
+    ];
+
+    /// <summary>有官方默认端点的 kind(base_url 可留空,拉取层有 fallback)。</summary>
+    private static readonly string[] OfficialKinds = ["deepseek", "zhipu", "minimax", "opencode_go"];
+
     /// <summary>静态文案回填(语言启动定型,重启生效;unpackaged 无 resw 可用)。</summary>
     private void ApplyStrings()
     {
@@ -89,6 +103,8 @@ public sealed partial class SettingsPage : UserControl
         BtnDelete.Content = L.T("api.delete");
         FKey.PlaceholderText = L.T("form.keyPlaceholder");
         FModel.PlaceholderText = L.T("form.modelPlaceholder");
+        TxtKindLabel.Text = L.T("form.kindLabel");
+        FBaseUrl.PlaceholderText = L.T("form.urlPlaceholder");
         BtnSave.Content = L.T("form.save");
         BtnCancel.Content = L.T("form.cancel");
         SecAdv.Text = L.T("sec.adv");
@@ -114,6 +130,7 @@ public sealed partial class SettingsPage : UserControl
         _main = main;
         ThemeCombo.ItemsSource = _themeOptions;
         LanguageCombo.ItemsSource = _languageOptions;
+        FKind.ItemsSource = _kindOptions;
         LoadGeneral();
         ReloadList();
         app.ConfigSaved += ReloadList;
@@ -616,6 +633,17 @@ public sealed partial class SettingsPage : UserControl
     {
         _editing = null;
         ClearForm();
+        _loading = true;
+        try
+        {
+            FKind.IsEnabled = true;
+            FKind.SelectedIndex = 0;
+        }
+        finally
+        {
+            _loading = false;
+        }
+        FormDetect.Visibility = Visibility.Collapsed;
         ShowFormPane();
     }
 
@@ -664,11 +692,17 @@ public sealed partial class SettingsPage : UserControl
             // key 留空 = 沿用已存(明文/密文都行,保存时解好放内存)
             FKey.Text = AppServices.PlainKey(p);
             FModel.Text = p.TryGetValue("model", out var m) && m is string ms ? ms : "";
+            // 编辑态 kind 定死(改 kind 会破坏 extra 语义):下拉禁用只回显
+            var kind = p.TryGetValue("kind", out var k) && k is string ks ? ks : "";
+            FKind.IsEnabled = false;
+            FKind.SelectedIndex = Math.Max(0,
+                _kindOptions.FindIndex(o => o.Value == kind));
         }
         finally
         {
             _loading = false;
         }
+        FormDetect.Visibility = Visibility.Collapsed;
     }
 
     private void ShowFormError(string? msg)
@@ -682,22 +716,79 @@ public sealed partial class SettingsPage : UserControl
         FormError.Visibility = Visibility.Visible;
     }
 
+    // ------------------------------------------------------------------
+    // 类型下拉 + 识别预览(纯本地正则,无网络)
+    // ------------------------------------------------------------------
+
+    private string SelectedKind =>
+        FKind.SelectedIndex >= 0 ? _kindOptions[FKind.SelectedIndex].Value : "";
+
+    private string KindLabel(string kind) => L.T("kind." + kind);
+
+    private void FKind_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        // 选官方类型时把默认端点填进 URL:仅在"空 or 还是别的官方默认"时,
+        // 用户手敲的自定义 URL 不动
+        var kind = SelectedKind;
+        if (OfficialKinds.Contains(kind))
+        {
+            var def = ConfigStore.DefaultBaseUrl(kind);
+            var cur = FBaseUrl.Text.Trim();
+            if (def.Length > 0 &&
+                (cur.Length == 0 || OfficialKinds.Any(k => ConfigStore.DefaultBaseUrl(k) == cur)))
+                FBaseUrl.Text = def;
+        }
+        UpdateDetectPreview();
+    }
+
+    private void FBaseUrl_LostFocus(object sender, RoutedEventArgs e) => UpdateDetectPreview();
+
+    private void FKey_LostFocus(object sender, RoutedEventArgs e) => UpdateDetectPreview();
+
+    /// <summary>自动识别态且填了内容时,实时展示 Detect 结论(JWT 撞形等提示不再丢失)。</summary>
+    private void UpdateDetectPreview()
+    {
+        if (_editing is not null || SelectedKind.Length > 0)
+        {
+            FormDetect.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var baseUrl = FBaseUrl.Text.Trim();
+        var key = FKey.Text.Trim();
+        if (baseUrl.Length == 0 && key.Length == 0)
+        {
+            FormDetect.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var d = Detect.Run(key: key, hintUrl: baseUrl);
+        FormDetect.Text = L.F("form.detect", KindLabel(d.Kind), d.Notes);
+        FormDetect.Visibility = Visibility.Visible;
+    }
+
     private async void BtnSave_Click(object sender, RoutedEventArgs e)
     {
         var baseUrl = FBaseUrl.Text.Trim();
         var key = FKey.Text.Trim();
         var model = FModel.Text.Trim();
 
-        if (baseUrl.Length == 0)
+        // 新增:下拉选了具体 kind 就不跑 Detect;编辑:kind 保持不变
+        var kind = _editing is not null
+            ? _editing.TryGetValue("kind", out var k0) && k0 is string ks0 ? ks0 : ""
+            : SelectedKind.Length > 0 ? SelectedKind
+            : Detect.Run(key: key, hintUrl: baseUrl).Kind;
+
+        // 官方 kind 拉取层对空 URL 有 fallback,允许留空;通用兼容必须给
+        if (baseUrl.Length == 0 && !OfficialKinds.Contains(kind))
         {
             ShowFormError(L.T("form.errEmptyUrl"));
             return;
         }
 
-        // 名称自动取 URL 域名,重名追加 -2/-3;编辑时保持原名不变
+        // 名称自动取 URL 域名(留空时用类型名),重名追加 -2/-3;编辑时保持原名不变
         // (改名会让暂停集合与托盘最紧张行的索引错位)
         var name = _editing is not null ? TryGetName(_editing)
-            : UniqueName(NameFromUrl(baseUrl));
+            : UniqueName(baseUrl.Length > 0 ? NameFromUrl(baseUrl) : KindLabel(kind));
 
         Dictionary<string, object?> entry;
         if (_editing is not null)
@@ -721,11 +812,11 @@ public sealed partial class SettingsPage : UserControl
             : "";
         if (_editing is null)
         {
-            // kind 只在新增时推断;已有条目改 kind 会破坏 extra 语义,走 config
-            entry["kind"] = Detect.Run(key: key, hintUrl: baseUrl).Kind;
+            // kind 只在新增时定死;已有条目改 kind 会破坏 extra 语义,走 config
+            entry["kind"] = kind;
         }
         entry["name"] = name;
-        entry["base_url"] = baseUrl;
+        SetOrRemove(entry, "base_url", baseUrl);
         if (newKey.Length > 0)
             entry["key"] = newKey;
         SetOrRemove(entry, "model", model);
@@ -774,4 +865,6 @@ public sealed partial class SettingsPage : UserControl
     private sealed record ThemeOption(string Text, string Value);
 
     private sealed record LanguageOption(string Text, string Value);
+
+    private sealed record KindOption(string Text, string Value);
 }

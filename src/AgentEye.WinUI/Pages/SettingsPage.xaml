@@ -186,7 +186,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- 表单态:只保留 url / key / model,其余走 config 文件 -->
+                    <!-- 表单态:类型 / url / key / model,其余走 config 文件 -->
                     <StackPanel x:Name="FormPane" Spacing="10"
                                 Visibility="Collapsed">
                         <Grid ColumnSpacing="10" RowSpacing="8">
@@ -199,16 +199,24 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="Base URL" VerticalAlignment="Center" />
-                            <TextBox x:Name="FBaseUrl" Grid.Column="1"
-                                     PlaceholderText="https://api.example.com" />
-                            <TextBlock Text="API Key" Grid.Row="1" VerticalAlignment="Center" />
-                            <TextBox x:Name="FKey" Grid.Row="1" Grid.Column="1" />
-                            <TextBlock Text="Model" Grid.Row="2" VerticalAlignment="Center" />
-                            <TextBox x:Name="FModel" Grid.Row="2" Grid.Column="1" />
+                            <TextBlock x:Name="TxtKindLabel" VerticalAlignment="Center" />
+                            <ComboBox x:Name="FKind" Grid.Column="1" MinWidth="120"
+                                      HorizontalAlignment="Left"
+                                      SelectionChanged="FKind_SelectionChanged" />
+                            <TextBlock Text="Base URL" Grid.Row="1" VerticalAlignment="Center" />
+                            <TextBox x:Name="FBaseUrl" Grid.Row="1" Grid.Column="1"
+                                     LostFocus="FBaseUrl_LostFocus" />
+                            <TextBlock Text="API Key" Grid.Row="2" VerticalAlignment="Center" />
+                            <TextBox x:Name="FKey" Grid.Row="2" Grid.Column="1"
+                                     LostFocus="FKey_LostFocus" />
+                            <TextBlock Text="Model" Grid.Row="3" VerticalAlignment="Center" />
+                            <TextBox x:Name="FModel" Grid.Row="3" Grid.Column="1" />
                         </Grid>
+                        <TextBlock x:Name="FormDetect" Foreground="{StaticResource AeTextSecondaryBrush}"
+                                   Visibility="Collapsed" TextWrapping="Wrap" />
                         <TextBlock x:Name="FormError" Foreground="{StaticResource AeErrorBrush}"
                                    Visibility="Collapsed" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
