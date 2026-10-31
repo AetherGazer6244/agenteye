@@ -4,7 +4,8 @@
 
 Windows 桌面多 Key AI 额度观察工具。UI 采用 Win11 Acrylic 紧凑毛玻璃面板
 (单窗、无导航栏、图标头部),另有两个常驻面:无边框桌面小组件(不抢焦点)
-与托盘图标(GDI 画 A 标数字牌:紧张度染色 + 最紧张 provider 的数字)。
+与托盘图标(GDI 画 A 标数字牌:紧张度染色 + 最紧张 provider 的数字);
+全局快捷键(默认 Ctrl+Shift+A)一键唤醒主面板。
 **只支持 Windows 10 1809+ / Win11**,依赖 DPAPI、WinRT toast 与 WinAppSDK,
 不承诺跨平台。Python/Tkinter 原版只存在于 `main` 与 `feat/glass-redesign`
 的历史里,不再维护。
@@ -13,11 +14,12 @@ Windows 桌面多 Key AI 额度观察工具。UI 采用 Win11 Acrylic 紧凑毛�
 
 - `src/AgentEye.Core`:net8.0 纯逻辑,**零 UI 依赖**——config v2 读写、
   DPAPI 加解密、6 种 provider 适配器、缓存、阈值判定、更新检查
-  (`Update/`:版本比较、release 解析、下载校验、安装器拉起)。只引
-  `System.Security.Cryptography.ProtectedData`。
+  (`Update/`:版本比较、release 解析、下载校验、安装器拉起)、快捷键解析
+  (`Hotkeys/HotkeySpec`)。只引 `System.Security.Cryptography.ProtectedData`。
 - `src/AgentEye.WinUI`:WinUI 3 壳——MainWindow(去导航紧凑单窗)、
   Pages(总览/设置)、Widget(小组件)、Tray(托盘)、Services(AeRes /
-  Poller / Notify / AppServices)、Styles(AeStyles.xaml)。
+  Poller / Notify / AppServices / HotkeyService / StartupService)、
+  Styles(AeStyles.xaml)。
 - `tests/AgentEye.Core.Tests`:xUnit,只测 Core(契约层),WinUI 层靠
   人工核对。
 
@@ -25,7 +27,7 @@ Windows 桌面多 Key AI 额度观察工具。UI 采用 Win11 Acrylic 紧凑毛�
 
 ```text
 dotnet build src\AgentEye.WinUI -c Debug -v q --nologo   # 0 error 才算过
-dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 105 passed
+dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 ```
 
 冒烟:启动 exe 7 秒未退出。改 XAML 后必须重构建确认 pass1 没有静默崩。
@@ -93,7 +95,7 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 105 passed
 - 头部图标按钮是 32×32、透明底、圆角 6 的 `Button` + `FontIcon`;
   按钮区右侧留白 = `AppWindow.TitleBar.RightInset / RasterizationScale`
   (物理像素换算 DIP),别硬编码。
-- 图标字形统一用 Segoe Fluent Icons 码位(E769/E768/E72C/E713/E72B、
+- 图标字形统一用 Segoe Fluent Icons 码位(E713/E72B、
   行图标 E99A/E943/E945/E756/E968/E774),不许内嵌图片。
 
 ## 图标资源契约
@@ -139,12 +141,63 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 105 passed
 - UI 只暴露 url/key/model;其余字段让用户手改 config。
 - 小组件几何:`ui.widget_pos` 落盘取松手时的 `_lastPos`(事件坐标),
   不读 `AppWindow.Position`(回显滞后);松手位移 <4px 判点击。
+- 全局快捷键:`ui.hotkey`(组合文本,默认 "Ctrl+Shift+A")+
+  `ui.hotkey_enabled`(开关,默认 true);组合文本只在 `ui` 自由字典里加键,
+  `schema_version` 仍是 2,Python 版 merge 会保留未知键,不受影响。
+- 开机自启:`ui.autostart` 只是镜像值,**真实状态以注册表为准**;
+  `ui.language`(默认 "zh-Hans")1.2.1 只落库不切换,中英双语 1.3.0 起生效。
+
+## 设置页版式契约(卡片行模板)
+
+- 每条功能 = 一张圆角卡片(`AeSettingsItemStyle`):左图标
+  (`AeSettingsIconStyle`,Segoe Fluent Icons 字形)+ 标题
+  (`AeSettingsItemTitleStyle`)+ 副说明(`AeSettingsItemSubtitleStyle`),
+  右控件;分节用 `AeSectionHeaderStyle`。
+- 行内布局一律 Grid 三列:`Auto`(图标)/ `*`(文字)/ `Auto`(控件);
+  控件列放不下时先裁标题,不许用固定宽横排 StackPanel。
+- 新样式只复用已有主题令牌(AeCardBrush / AeCardStrokeBrush /
+  AeTextSecondaryBrush),要新颜色必须 Light/Dark 两边都加。
+- **设置页不保留常驻状态小字**(热键「已生效…」、自启「已登记:…」一律不要);
+  错误一律走弹窗(`ContentDialog`),成功静默。
+
+## 开机自启契约
+
+- 写 HKCU `Software\Microsoft\Windows\CurrentVersion\Run` 的 "AgentEye" 项,
+  值 = `"<exe 路径>" --minimized`——**必须与安装器 `AgentEye_Setup.iss` 里
+  那条同键同格式**,否则两边互相看不见对方的开关。
+- `--minimized` 由 `App.xaml.cs` 解析:建窗后 `AppWindow.Hide()`,静默进
+  托盘(托盘/小组件照常);不带参数则正常显示主面板。
+- 注册表读写失败只回滚 UI 开关 + 弹窗提示,不许崩主流程。
+
+## 全局快捷键契约
+
+- 组合解析在 `Core/Hotkeys/HotkeySpec.cs`(纯逻辑,修饰键位与键码常量与
+  Win32 同值,Core 不引 Win32);壳层 `Services/HotkeyService.cs` 只做
+  `RegisterHotKey` 与消息转发。
+- **`RegisterHotKey` 必须在窗口所属线程上调用**,否则直接失败(1408)——
+  服务是独立线程 + 自建隐藏窗口(照托盘范式),所以注册/注销都经自定义
+  消息 `WM_APP_APPLY` 交给热键线程执行,调用方等 `ManualResetEventSlim`。
+- 至少要有一个修饰键(Ctrl/Alt/Shift/Win):裸键会劫持日常打字,解析层
+  直接拒绝。
+- 组合被别的程序占用(1409)只落 `HotkeyService.Status` 文案,设置页**弹窗**提示,
+  应用照常运行——不许因此崩主流程(增强面契约)。
+- 设置页「录制」:文本框既可手打(解析器大小写不敏感),也可**直接按组合键**
+  录入——但只有"输入框内容仍是已保存的值"时按键才算录入,用户一旦手动改字
+  就交回输入框(否则打 "+" 会被误判成组合)。**WinUI 的 `KeyRoutedEventArgs`
+  不带修饰键**,修饰键状态走 Win32 `GetKeyState`;Esc 取消;非法组合当场
+  提示并回滚,不写坏值。
+- 唤醒语义:托盘左键 / 小组件点击 = 总是拉回前台(`MainWindow.WakeUp()`);
+  **热键 = 唤醒/隐藏切换**(`MainWindow.TogglePanel()`):面板在前台就
+  `AppWindow.Hide()` 藏回托盘,否则拉回前台。隐藏 ≠ 退出(托盘/轮询继续),
+  关主窗 X 仍是退出。热键不给前台权,`SetForegroundWindow` 被拒时借前台线程
+  (`AttachThreadInput`)再试。
 
 ## 增强面降级
 
 托盘(`TrayIconService`,Shell_NotifyIconW + `TrayIconRenderer` 画的
-A 标数字牌)与小组件(`WidgetWindow`,WS_EX_NOACTIVATE|TOOLWINDOW)
-都是增强面:任何 Win32/WinRT 步骤失败只能静默降级,不许把主流程带崩。
+A 标数字牌)、小组件(`WidgetWindow`,WS_EX_NOACTIVATE|TOOLWINDOW)与
+全局快捷键(`HotkeyService`,RegisterHotKey)都是增强面:任何 Win32/WinRT
+步骤失败只能静默降级,不许把主流程带崩。
 `DesktopAcrylicBackdrop` 在老系统上可能抛异常,赋值处必须 try/catch。
 系统「透明效果」关闭时(注册表 `EnableTransparency=0`)Windows 一律不渲染
 Acrylic/Mica,窗口退化为不透明底色——这是系统策略,别去代码里绕。

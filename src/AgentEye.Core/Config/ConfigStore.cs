@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AgentEye.Core.Hotkeys;
 using AgentEye.Core.Security;
 
 namespace AgentEye.Core.Config;
@@ -104,6 +105,10 @@ public sealed class ConfigStore
             ["x"] = null, ["y"] = null, ["width"] = 420, ["height"] = 560,
             ["order"] = new List<object?>(), ["pinned"] = true,
             ["widget"] = false, ["theme"] = "auto",
+            // 全局快捷键(唤醒主面板):文本组合 + 开关,与 Python 版同源不冲突
+            ["hotkey"] = HotkeySpec.DefaultText, ["hotkey_enabled"] = true,
+            // 开机自启动(应用侧写 HKCU Run)+ 界面语言(1.3.0 起支持中英切换)
+            ["autostart"] = false, ["language"] = "zh-Hans",
         },
         ["providers"] = new List<object?>(),
     };

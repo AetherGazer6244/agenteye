@@ -3,7 +3,7 @@
 Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 紧凑面板 +
 托盘常驻 + 桌面小组件,盯着各平台 API 额度,快烧完时提前告警。
 
-![version](https://img.shields.io/badge/version-v1.1.1-blue)
+![version](https://img.shields.io/badge/version-v1.2.3-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B%20%2F%2011-blueviolet)
 ![runtime](https://img.shields.io/badge/runtime-.NET%208%20%2B%20WinAppSDK%201.7-5C2D91)
 
@@ -28,10 +28,20 @@ Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 
   (系统策略,非缺陷)。
 - **托盘常驻**:Shell_NotifyIconW + 纯 GDI 渲染的应用 A 标,按额度紧张度
   染色(蓝→绿→橙→红,无数据走灰)+ 右下角数字牌(最紧张 provider 的已用
-  百分比)。左键唤起主面板,右键菜单(暂停轮询 / 立即刷新 / 切换小组件 / 退出)。
+  百分比)。左键唤起主面板,右键菜单(打开主面板 / 切换小组件 / 设置 / 退出)。
 - **桌面小组件**:无边框置顶 260×64(高度随行数自适应),Acrylic 背板,
   不抢焦点(WS_EX_NOACTIVATE);按住拖动、松手位移 < 4px 判定为点击并唤起
   主面板,位置落盘记忆。
+- **全局快捷键**:默认 `Ctrl+Shift+A` 一键唤醒主面板(最小化 / 被遮挡都能
+  唤回并置前);面板在前台时再按一次则**藏回托盘**。设置页的「唤醒快捷键」
+  文本框既可手打(`ctrl+shift+a`,大小写不敏感)也可直接按组合键录入,
+  「清除」即停用;落盘 `ui.hotkey`,改完立即生效。组合被别的程序占用时
+  设置页给出提示,不影响其它功能。热键仅在 AgentEye 运行期间生效。
+- **开机自启动**:设置页开关写 HKCU 启动项(与安装器同一条),开机静默进
+  托盘不弹主面板。
+- **设置页**:按 Windows 11 设置的卡片行版式重排 —— 外观模式(下拉)/
+  开机自启动 / 语言(1.3.0 起可切中英) / 唤醒快捷键 / 告警阈值 /
+  API 管理 / 高级(主面板宽高)/ 关于软件。
 - **阈值告警**:默认剩余 < 30% 预警、余额 < ¥5 临界(均可在 config 调);
   WinRT toast 通知,同一 provider 同一等级 60 分钟冷却,等级升级(黄转红)
   立即重警;toast 不可用时降级 MessageBeep。
@@ -72,6 +82,10 @@ model 三项,其余字段手改后重启生效:
 | `ui.theme` | "auto" | `light` / `dark` / `auto` |
 | `ui.width` / `ui.height` | 420 / 560 | 主窗尺寸(物理像素,320×400 ~ 800×1200) |
 | `ui.widget` | false | 桌面小组件开关 |
+| `ui.hotkey` | "Ctrl+Shift+A" | 全局快捷键组合(唤醒/隐藏主面板) |
+| `ui.hotkey_enabled` | true | 全局快捷键开关 |
+| `ui.autostart` | false | 开机自启动镜像值(真实状态以 HKCU 启动项为准) |
+| `ui.language` | "zh-Hans" | 界面语言(中英双语自 1.3.0 起可切) |
 | `providers[]` | [] | 列表项:`id` / `kind` / `name` / `base_url` / `key_enc` |
 
 - `kind` 取值:`deepseek` / `zhipu` / `minimax` / `opencode_go` / `relay` /
@@ -91,8 +105,9 @@ dotnet build src\AgentEye.WinUI -c Debug
 dotnet test tests\AgentEye.Core.Tests
 ```
 
-105 个测试覆盖配置层(v2 schema、DPAPI、v1 迁移、损坏隔离)与 provider 层
-(探测、6 种适配器、中转站、缓存、告警状态)。
+130 个测试覆盖配置层(v2 schema、DPAPI、v1 迁移、损坏隔离)、provider 层
+(探测、6 种适配器、中转站、缓存、告警状态)与快捷键解析(组合解析 / 校验 /
+往返)。
 
 一键发布(publish → 剪 pdb → `dist\` 便携目录 → `installer\AgentEye_Setup.exe`,
 需 Inno Setup 6):
@@ -124,10 +139,11 @@ src\AgentEye.Core        逻辑层(net8.0,无 UI 依赖)
   Security\              DpapiCrypt(密钥加解密)
   Cache\                 models/probe/alert 状态缓存
   Update\                版本比较、release 解析、下载校验、安装器拉起
+  Hotkeys\               HotkeySpec(快捷键组合解析,纯逻辑)
 src\AgentEye.WinUI       壳层(WinUI 3)
   Assets\                AgentEye.ico(应用图标,唯一来源)
   Pages\                 OverviewPage / SettingsPage
-  Services\              AeRes / AeAppIcon / AppServices / PollerService / NotifyService / UpdateService
+  Services\              AeRes / AeAppIcon / AppServices / PollerService / NotifyService / UpdateService / HotkeyService / StartupService
   Styles\                AeStyles.xaml(工程自有样式)
   Tray\                  托盘(纯 Win32 + GDI):TrayIconService / TrayIconRenderer
   Widget\                桌面小组件

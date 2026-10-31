@@ -1,5 +1,86 @@
 # Changelog
 
+## 2026-10-31 — 1.2.3:告警关闭时收纳阈值行
+
+### 修复
+
+- 告警卡片的两条阈值行(剩余百分比 ≤ / 剩余额度 ≤)不再常驻:
+  开关**关**时整层收纳(卡片只留开关行),**开**时展开;初态跟随
+  `alert.enable`,进页不闪
+
+## 2026-10-31 — 1.2.2:删除暂停轮询 / 立即刷新入口
+
+### 修复
+
+- 主窗口头部删掉「暂停轮询 / 立即刷新」两颗按钮,头部只剩
+  返回(E72B)/ 设置(E713)
+- 托盘右键菜单同步删掉「暂停轮询 / 立即刷新」两项:
+  **打开主面板 / 切换小组件 / — / 设置 / 退出**
+- `PollerService` 的全局暂停机制(`ToggleGlobalPause` / `IsGloballyPaused`)
+  随两个入口一并移除(零入口死代码)
+
+### 说明
+
+- 行级「暂停此 provider」(总览行右键,`Paused` 集合)不受影响
+- 轮询本身照常:`PeriodicTimer` 循环 + 首启刷一轮 + 设置保存后重刷;
+  想停轮询把 `refresh_interval_sec` 调大即可
+
+## 2026-10-30 — 1.2.1:设置页改版 + 全局快捷键 + 开机自启动
+
+### 新增
+
+- **全局快捷键(唤醒 / 隐藏主面板)**,默认 `Ctrl+Shift+A`
+  - `Core\Hotkeys\HotkeySpec.cs`:纯逻辑快捷键解析器("Ctrl+Shift+A" ⇄ 修饰键
+    位 + 虚拟键码),修饰键/键码常量与 Win32 同值;校验"至少一个修饰键",
+    免得裸键劫持日常打字
+  - `WinUI\Services\HotkeyService.cs`:`RegisterHotKey` + 自建隐藏窗口(独立
+    线程 + 自己的消息泵,照托盘范式),`MOD_NOREPEAT` 按住不连发;改键后即时
+    重注册,被占用时只落状态文案
+  - 设置页「唤醒快捷键」行:文本框既可手打(`ctrl+shift+a`,大小写不敏感)
+    也可直接按组合键录入,「清除」= 停用热键;非法组合当场提示并回滚
+  - 语义 = **唤醒 + 隐藏切换**:面板在前台时按热键藏回托盘,否则拉到前台;
+    托盘左键 / 小组件点击仍是"拉回来"
+  - `MainWindow.WakeUp()`:最小化先还原再置前;热键不自动给前台权,
+    `SetForegroundWindow` 被系统拒绝时借前台线程(`AttachThreadInput`)再试
+  - config 新增 `ui.hotkey`(默认 "Ctrl+Shift+A")与 `ui.hotkey_enabled`
+    (默认 true),仍在 v2 schema 内,Python 版同源不受影响
+- **开机自启动**:`WinUI\Services\StartupService.cs` 读写 HKCU
+  `Software\Microsoft\Windows\CurrentVersion\Run` 的 "AgentEye" 项(与安装器
+  同键同格式);并实现 `--minimized` 启动参数 → 开机静默进托盘不弹主面板
+  (安装器早就在传这个参数,应用一直没接)
+- **高级设置:主窗口面板大小**:宽/高数字框(320×400 ~ 800×1200)即时
+  resize 并落盘 `ui.width/ui.height`,另有「恢复默认 420×560」
+- **关于软件**分节:「查看详情」用系统浏览器打开项目主页
+- config 新增 `ui.autostart`(镜像值,真实状态以注册表为准)与
+  `ui.language`(默认 "zh-Hans")
+
+### 变更
+
+- **设置页整页改版**:按 Windows 11 设置的"卡片行"模板重排——图标 + 标题 +
+  副说明 | 右侧控件;分节标题(外观 / 快捷键 / 告警 / API 管理 / 高级 /
+  关于软件)。外观模式从单选按钮组换成下拉框(跟随系统 / 浅色 / 深色)
+- 新增卡片行样式(`Styles\AeStyles.xaml`):`AeSectionHeaderStyle` /
+  `AeSettingsItemStyle` / `AeSettingsItemTitleStyle` /
+  `AeSettingsItemSubtitleStyle` / `AeSettingsIconStyle`
+- 「语言」行先落库不切换:中英双语自 **1.3.0** 起提供(1.2.1 只有简体中文)
+
+### 修复
+
+- 设置页去掉常驻状态小字(热键「已生效…」、自启「已登记:…」一律不要):
+  错误一律走弹窗(`ContentDialog`)——热键组合无效、热键被占用(1409)、
+  自启写注册表失败;成功保持静默,界面不再堆状态行
+- `GetModuleHandleW` 声明在了 user32(应为 kernel32):热键窗口线程直接抛
+  `EntryPointNotFoundException`,热键服务整个起不来(静默降级,主流程无感)
+
+### 说明
+
+- `RegisterHotKey` 必须在**窗口所属线程**上调用,否则直接失败(1408);
+  注册/注销都经自定义消息交给热键线程执行
+- 组合被别的程序占用(1409)时设置页弹窗提示,应用照常运行
+- 热键仅在本进程运行期间生效,不负责拉起未运行的程序
+- 隐藏主面板 ≠ 退出:托盘、小组件、轮询继续跑;关主窗 X 仍是退出
+- 测试基线 105 → 130
+
 ## 2026-10-28 — 1.1.1:README 重写 + 仓库截图
 
 ### 说明

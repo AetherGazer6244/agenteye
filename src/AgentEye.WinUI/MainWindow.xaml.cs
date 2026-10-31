@@ -2,6 +2,7 @@ using AgentEye.WinUI.Pages;
 using AgentEye.WinUI.Services;
 using AgentEye.WinUI.Tray;
 using AgentEye.WinUI.Widget;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.Runtime.InteropServices;
@@ -82,6 +83,8 @@ public sealed partial class MainWindow : Window
     private SettingsPage? _settings;
     private TrayIconService? _tray;
     private WidgetWindow? _widget;
+    private HotkeyService? _hotkey;
+    private string _hotkeyStatus = "";
     private bool _closed;
 
     public MainWindow()
@@ -157,6 +160,14 @@ public sealed partial class MainWindow : Window
         }
         catch { /* 增强面,失败静默 */ }
 
+        // 全局快捷键(唤醒/隐藏主面板);失败静默降级(不把主流程带崩)
+        try
+        {
+            _hotkey = new HotkeyService(TogglePanel);
+            ApplyHotkey();
+        }
+        catch { _hotkey = null; _hotkeyStatus = "热键服务不可用"; }
+
         // 主题跟随系统:auto 时系统切换会触发这里,同步按钮配色即可,
         // 页面/小组件各自监听 ActualThemeChanged 重渲染
         Root.ActualThemeChanged += (_, _) => SyncCaptionButtons();
@@ -231,29 +242,11 @@ public sealed partial class MainWindow : Window
 
     // ---------------- 头部图标按钮 ----------------
 
-    private void BtnPause_Click(object sender, RoutedEventArgs e)
-    {
-        var paused = _app.Poller.ToggleGlobalPause();
-        if (!paused) _ = _app.Poller.RefreshNowAsync();
-        SyncPauseGlyph();
-    }
-
-    private void BtnRefresh_Click(object sender, RoutedEventArgs e)
-        => _ = _app.Poller.RefreshNowAsync();
-
     private void BtnSettings_Click(object sender, RoutedEventArgs e)
         => ShowPage("settings");
 
     private void BtnBack_Click(object sender, RoutedEventArgs e)
         => ShowPage("overview");
-
-    /// <summary>暂停按钮字形/提示随全局暂停态切换(托盘切了也要跟上)。</summary>
-    public void SyncPauseGlyph() => DispatcherQueue.TryEnqueue(() =>
-    {
-        var paused = _app.Poller.IsGloballyPaused;
-        PauseIcon.Glyph = paused ? "\uE768" : "\uE769";
-        ToolTipService.SetToolTip(BtnPause, paused ? "恢复轮询" : "暂停轮询");
-    });
 
     /// <summary>托盘/外部入口:封送 UI 线程后进设置页。</summary>
     public void GoSettings() => DispatcherQueue.TryEnqueue(() => ShowPage("settings"));
@@ -276,12 +269,122 @@ public sealed partial class MainWindow : Window
 
     public bool WidgetVisible => _widget?.IsVisible ?? false;
 
-    public void RestoreFromTray() => DispatcherQueue.TryEnqueue(() =>
+    public void RestoreFromTray() => WakeUp();
+
+    /// <summary>
+    /// 唤醒主面板:最小化先还原,再显示并置前。
+    /// 托盘左键 / 小组件点击 / 全局热键三条入口共用这一条路径。
+    /// </summary>
+    public void WakeUp() => DispatcherQueue.TryEnqueue(ShowPanel);
+
+    /// <summary>当前热键状态文案(设置页回显;失败原因也在这里)。</summary>
+    public string HotkeyStatus => _hotkeyStatus;
+
+    /// <summary>按当前配置重注册全局热键(设置页改键后立即调用)。</summary>
+    public void ApplyHotkey()
     {
-        Activate();
-        AppWindow.Show();
-        SetForegroundWindow(WindowNative.GetWindowHandle(this));
+        try
+        {
+            if (_hotkey is null)
+            {
+                _hotkeyStatus = "热键服务不可用";
+                return;
+            }
+            _hotkey.Apply(_app.HotkeyText, _app.HotkeyUsable);
+            _hotkeyStatus = _hotkey.Status;
+        }
+        catch { _hotkeyStatus = "热键设置失败"; }
+    }
+
+    /// <summary>
+    /// 全局热键语义:面板在前台就藏回托盘,否则把它拉到前台。
+    /// (隐藏 ≠ 退出:进程、托盘、小组件都还在,再按一次就回来)
+    /// </summary>
+    public void TogglePanel() => DispatcherQueue.TryEnqueue(() =>
+    {
+        try
+        {
+            var hwnd = WindowNative.GetWindowHandle(this);
+            var presenter = AppWindow.Presenter as OverlappedPresenter;
+            var minimized = presenter is not null &&
+                            presenter.State == OverlappedPresenterState.Minimized;
+            var inFront = hwnd != nint.Zero && GetForegroundWindow() == hwnd;
+            if (!minimized && inFront)
+            {
+                AppWindow.Hide();
+                return;
+            }
+            ShowPanel();
+        }
+        catch { /* 增强面:切换失败不许崩主流程 */ }
     });
+
+    /// <summary>把主面板显示出来并置前(最小化先还原)。</summary>
+    private void ShowPanel()
+    {
+        try
+        {
+            // 最小化状态要先还原(Show 不会把最小化的窗口拉回来)
+            if (AppWindow.Presenter is OverlappedPresenter op &&
+                op.State == OverlappedPresenterState.Minimized)
+                op.Restore();
+            else
+                AppWindow.Show();
+            Activate();
+            BringToFront(WindowNative.GetWindowHandle(this));
+        }
+        catch { /* 增强面:唤醒失败不许崩主流程 */ }
+    }
+
+    /// <summary>隐藏主面板(进程存活,托盘/小组件继续;热键再按可唤回)。</summary>
+    public void HidePanel()
+    {
+        try { AppWindow.Hide(); }
+        catch { /* 增强面 */ }
+    }
+
+    /// <summary>高级设置:立即改主窗口尺寸并落盘(物理像素)。</summary>
+    public void ApplyWindowSize(int width, int height)
+    {
+        try
+        {
+            var w = Math.Clamp(width, MinWidth, MaxWidth);
+            var h = Math.Clamp(height, MinHeight, MaxHeight);
+            AppWindow.Resize(new SizeInt32(w, h));
+            _app.SetWindowSize(w, h);
+            _app.TrySaveCfg();
+        }
+        catch { /* 增强面:改尺寸失败不影响主流程 */ }
+    }
+
+    /// <summary>恢复默认主窗口尺寸(420×560)。</summary>
+    public void ResetWindowSize() => ApplyWindowSize(DefaultWidth, DefaultHeight);
+
+    /// <summary>
+    /// 置前:全局热键不自动给前台权,SetForegroundWindow 被系统拒绝时
+    /// 借前台线程的输入队列再试一次(老坑,不试就"按了没反应")。
+    /// </summary>
+    private static void BringToFront(nint hwnd)
+    {
+        if (hwnd == nint.Zero) return;
+        try
+        {
+            if (SetForegroundWindow(hwnd)) return;
+            var fg = GetForegroundWindow();
+            if (fg == nint.Zero) return;
+            var fgThread = GetWindowThreadProcessId(fg, out _);
+            var myThread = GetCurrentThreadId();
+            if (fgThread == 0 || fgThread == myThread) return;
+            if (!AttachThreadInput(myThread, fgThread, true)) return;
+            try
+            {
+                ShowWindow(hwnd, 9); // SW_RESTORE
+                SetForegroundWindow(hwnd);
+            }
+            finally { AttachThreadInput(myThread, fgThread, false); }
+        }
+        catch { /* 增强面:置前失败不影响唤醒 */ }
+    }
 
     public void ToggleWidget() => DispatcherQueue.TryEnqueue(() =>
     {
@@ -351,9 +454,25 @@ public sealed partial class MainWindow : Window
         catch { /* 关窗路径绝不因写盘失败崩溃 */ }
         _widget?.Dispose();
         _tray?.Dispose();
+        _hotkey?.Dispose();
         _app.Poller.Dispose();
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint pid);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hWnd, int nCmdShow);
 }

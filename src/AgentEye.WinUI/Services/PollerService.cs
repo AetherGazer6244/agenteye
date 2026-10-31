@@ -47,27 +47,6 @@ public sealed class PollerService : IDisposable
         _loop = null;
     }
 
-    private bool _globalPaused;
-
-    /// <summary>托盘菜单文案用:当前是否处于全局暂停。</summary>
-    public bool IsGloballyPaused => _globalPaused;
-
-    /// <summary>全局暂停/恢复(行不重建,只是不再发请求)。返回暂停后的状态。</summary>
-    public bool ToggleGlobalPause()
-    {
-        if (_globalPaused)
-        {
-            _globalPaused = false;
-            Start();
-        }
-        else
-        {
-            _globalPaused = true;
-            Stop();
-        }
-        return _globalPaused;
-    }
-
     private async Task LoopAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -92,7 +71,7 @@ public sealed class PollerService : IDisposable
         }
     }
 
-    /// <summary>立即刷一轮(供按钮/托盘调用)。进行中则忽略,不叠加。</summary>
+    /// <summary>立即刷一轮(首启/设置保存/行右键菜单调用)。进行中则忽略,不叠加。</summary>
     public async Task RefreshNowAsync(CancellationToken ct = default)
     {
         if (Interlocked.CompareExchange(ref _inFlight, 1, 0) != 0) return;

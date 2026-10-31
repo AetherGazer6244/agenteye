@@ -1,4 +1,5 @@
 using AgentEye.Core.Config;
+using AgentEye.Core.Hotkeys;
 using AgentEye.Core.Providers;
 using AgentEye.Core.Update;
 using AgentEye.WinUI.Services;
@@ -6,27 +7,60 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using System.Runtime.InteropServices;
+using Windows.System;
 
 namespace AgentEye.WinUI.Pages;
 
 /// <summary>
-/// 设置页:外观 / 告警 / API 管理(列表 ↔ 表单同窗切换)。
-/// 表单只暴露 url / key / model;名称自动取 URL 域名,kind 由 key/URL 形态
-/// 推断(新增时),其余高级字段走 config 文件。契约:provider 名称唯一;
-/// 删除要输入名称确认;key 留空则沿用已存。
+/// 设置页:外观 / 快捷键 / 告警 / API 管理 / 高级 / 关于软件。
+/// 版式按 Windows 11 设置的"卡片行"模板:图标 + 标题 + 副标题 | 右侧控件。
+///
+/// 契约:
+/// - 快捷键文本框既可手打("ctrl+shift+a",解析器大小写不敏感),也可直接按
+///   组合键录入;只有"输入框还是原样"时按键才算录入,用户一旦改字就交回输入框。
+/// - 组合非法当场提示并回滚,不让坏值落盘;占用(1409)只落状态文案。
+/// - provider 表单只暴露 url / key / model;名称自动取 URL 域名,kind 由 key/URL
+///   形态推断(新增时),其余高级字段走 config 文件。provider 名称唯一;
+///   删除要输入名称确认;key 留空则沿用已存。
 /// </summary>
 public sealed partial class SettingsPage : UserControl
 {
+    // Win32 修饰键虚拟键码(取修饰键状态用)
+    private const int VkShift = 0x10, VkControl = 0x11, VkMenu = 0x12,
+                      VkLWin = 0x5B, VkRWin = 0x5C;
+
+    private const string RepoUrl = "https://github.com/Cecilian-Elysian/AgentEye";
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int nVirtKey);
+
     private readonly AppServices _app;
     private readonly MainWindow _main;
     private Dictionary<string, object?>? _editing; // 非 null = 编辑模式
     private bool _loading;                          // 回显期间不触发保存
+    private CancellationTokenSource? _sizeDebounce;
+
+    private readonly List<ThemeOption> _themeOptions =
+    [
+        new("跟随系统", "auto"),
+        new("浅色", "light"),
+        new("深色", "dark"),
+    ];
+
+    // 1.2.1 只落库不切换;中英双语自 1.3.0 起生效
+    private readonly List<LanguageOption> _languageOptions =
+    [
+        new("简体中文", "zh-Hans"),
+    ];
 
     public SettingsPage(AppServices app, MainWindow main)
     {
         InitializeComponent();
         _app = app;
         _main = main;
+        ThemeCombo.ItemsSource = _themeOptions;
+        LanguageCombo.ItemsSource = _languageOptions;
         LoadGeneral();
         ReloadList();
         app.ConfigSaved += ReloadList;
@@ -41,10 +75,35 @@ public sealed partial class SettingsPage : UserControl
         ShowListPane();
         LoadGeneral();
         ReloadList();
+        // 热键当前注册失败(组合被别的程序占用)时提示一次;
+        // 启动阶段不弹——增强面静默降级,别在开机时打扰用户
+        var status = _main.HotkeyStatus;
+        if (status.StartsWith("注册失败", StringComparison.Ordinal))
+            _ = ShowErrorAsync("快捷键未生效", status);
+    }
+
+    /// <summary>错误提示走弹窗(设置页不保留常驻状态小字)。</summary>
+    private async Task ShowErrorAsync(string title, string message)
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = title,
+                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "好",
+            };
+            await dialog.ShowAsync();
+        }
+        catch
+        {
+            // 弹不出来(无 XamlRoot 等):静默,不崩主流程
+        }
     }
 
     // ------------------------------------------------------------------
-    // 外观 / 告警(轮询周期走 config,不在 UI 暴露)
+    // 通用区回显(外观 / 快捷键 / 告警 / 高级 / 关于)
     // ------------------------------------------------------------------
 
     private void LoadGeneral()
@@ -52,15 +111,22 @@ public sealed partial class SettingsPage : UserControl
         _loading = true;
         try
         {
-            ThemeChoice.SelectedIndex = _app.ThemeChoice switch
-            {
-                "dark" => 0, "light" => 1, _ => 2,
-            };
+            ThemeCombo.SelectedIndex = Math.Max(0, _themeOptions.FindIndex(o => o.Value == _app.ThemeChoice));
+            AutostartSwitch.IsOn = StartupService.IsEnabled();
+            LanguageCombo.SelectedIndex = 0;
+
+            HotkeyBox.Text = _app.HotkeyText;
+
             var alert = _app.AlertDict();
             AlertEnable.IsOn = alert.TryGetValue("enable", out var en) && en is true;
+            SyncAlertThresholds();
             WarnPctBox.Value = alert.TryGetValue("warn_pct", out var w) ? Convert.ToDouble(w) : 30;
             CriticalYuanBox.Value = alert.TryGetValue("critical_amount_yuan", out var c)
                 ? Convert.ToDouble(c) : 5.0;
+
+            WidthBox.Value = _app.WindowWidth;
+            HeightBox.Value = _app.WindowHeight;
+
             VersionText.Text = $"当前版本 v{UpdateService.CurrentVersion}" +
                                $"(更新源 github.com/{UpdateChecker.Owner}/{UpdateChecker.Repo})";
         }
@@ -70,21 +136,208 @@ public sealed partial class SettingsPage : UserControl
         }
     }
 
-    private void Theme_Changed(object sender, SelectionChangedEventArgs e)
+    // ------------------------------------------------------------------
+    // 外观模式
+    // ------------------------------------------------------------------
+
+    private void ThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading) return;
-        var choice = ThemeChoice.SelectedIndex switch { 0 => "dark", 1 => "light", _ => "auto" };
+        if (ThemeCombo.SelectedIndex < 0) return;
+        var choice = _themeOptions[ThemeCombo.SelectedIndex].Value;
         _app.SetThemeChoice(choice);
         _main.ApplyTheme(choice);
         _app.TrySaveCfg();
         _main.RefreshOverviewPalette();
     }
 
+    // ------------------------------------------------------------------
+    // 开机自启动(HKCU Run 键,与应用安装器同一条)
+    // ------------------------------------------------------------------
+
+    private void AutostartSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var want = AutostartSwitch.IsOn;
+        if (StartupService.SetEnabled(want, out var error))
+        {
+            _app.SetAutostart(want);
+            _app.TrySaveCfg();
+        }
+        else
+        {
+            // 写不进去就回滚开关,别让界面与注册表不一致
+            _loading = true;
+            AutostartSwitch.IsOn = !want;
+            _loading = false;
+            _ = ShowErrorAsync("无法设置开机自启动", error ?? "写入启动项失败");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 语言(1.2.1 先落库,中英双语 1.3.0 起可切)
+    // ------------------------------------------------------------------
+
+    private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (LanguageCombo.SelectedIndex < 0) return;
+        var lang = _languageOptions[LanguageCombo.SelectedIndex].Value;
+        _app.SetLanguage(lang);
+        _app.TrySaveCfg();
+    }
+
+    // ------------------------------------------------------------------
+    // 唤醒快捷键(文本框:手打 / 按键录入 / 清除)
+    // ------------------------------------------------------------------
+
+    private void HotkeyBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (_loading) return;
+        if (e.Key == VirtualKey.Enter)
+        {
+            CommitHotkeyText();
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == VirtualKey.Escape)
+        {
+            HotkeyBox.Text = _app.HotkeyText;
+            e.Handled = true;
+            return;
+        }
+        // 只按了修饰键:等用户按主键,不提示
+        if (e.Key is VirtualKey.Control or VirtualKey.Shift or VirtualKey.Menu
+            or VirtualKey.LeftWindows or VirtualKey.RightWindows)
+            return;
+        // 输入框已被手动改过 → 这是在打字,别抢
+        if (!HotkeyBoxUntouched) return;
+
+        var mods = 0;
+        if (IsDown(VkControl)) mods |= HotkeySpec.ModControl;
+        if (IsDown(VkMenu)) mods |= HotkeySpec.ModAlt;
+        if (IsDown(VkShift)) mods |= HotkeySpec.ModShift;
+        if (IsDown(VkLWin) || IsDown(VkRWin)) mods |= HotkeySpec.ModWin;
+        if (mods == 0) return; // 普通字符,交给输入框
+
+        e.Handled = true;
+        if (!HotkeySpec.TryFromVirtualKey((int)e.Key, mods, out var spec, out var error) ||
+            spec is null)
+        {
+            _ = ShowErrorAsync("组合无效", error ?? "请按字母/数字/功能键");
+            return;
+        }
+        ApplyHotkey(spec.ToText(), true);
+    }
+
+    private void HotkeyBox_KeyUp(object sender, KeyRoutedEventArgs e) { }
+
+    /// <summary>失焦提交(手打的文本);内容没变就不动。</summary>
+    private void HotkeyBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        if (HotkeyBoxUntouched) return;
+        CommitHotkeyText();
+    }
+
+    /// <summary>输入框是否还停留在已保存的值(没被用户改过)。</summary>
+    private bool HotkeyBoxUntouched =>
+        string.Equals(HotkeyBox.Text.Trim(), _app.HotkeyText, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>提交手打文本:非法当场弹窗提示并回滚,不写坏值。</summary>
+    private void CommitHotkeyText()
+    {
+        var text = HotkeyBox.Text.Trim();
+        if (text.Length == 0)
+        {
+            ApplyHotkey("", false);
+            return;
+        }
+        if (!HotkeySpec.TryParse(text, out var spec, out var error) || spec is null)
+        {
+            HotkeyBox.Text = _app.HotkeyText;
+            _ = ShowErrorAsync("组合无效", $"{error}(例如 Ctrl+Shift+A)");
+            return;
+        }
+        ApplyHotkey(spec.ToText(), true);
+    }
+
+    private void ApplyHotkey(string text, bool enabled)
+    {
+        _app.SetHotkey(text, enabled);
+        _app.TrySaveCfg();
+        _main.ApplyHotkey();
+        HotkeyBox.Text = _app.HotkeyText;
+        // 注册失败(被别的程序占用)才提示;成功静默,界面不留状态小字
+        var status = _main.HotkeyStatus;
+        if (status.StartsWith("注册失败", StringComparison.Ordinal))
+            _ = ShowErrorAsync("快捷键未生效", status);
+    }
+
+    private void BtnClearHotkey_Click(object sender, RoutedEventArgs e)
+        => ApplyHotkey("", false);
+
+    // ------------------------------------------------------------------
+    // 高级:主窗口面板大小
+    // ------------------------------------------------------------------
+
+    private async void SizeBox_Changed(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_loading) return;
+        if (double.IsNaN(WidthBox.Value) || double.IsNaN(HeightBox.Value)) return;
+        // 防抖:连续敲数字时别一路 resize
+        _sizeDebounce?.Cancel();
+        _sizeDebounce = new CancellationTokenSource();
+        var token = _sizeDebounce.Token;
+        try { await Task.Delay(350, token); }
+        catch { return; }
+        if (token.IsCancellationRequested) return;
+        var w = (int)Math.Round(WidthBox.Value);
+        var h = (int)Math.Round(HeightBox.Value);
+        _main.ApplyWindowSize(w, h);
+    }
+
+    private void BtnResetSize_Click(object sender, RoutedEventArgs e)
+    {
+        _main.ResetWindowSize();
+        _loading = true;
+        try
+        {
+            WidthBox.Value = _app.WindowWidth;
+            HeightBox.Value = _app.WindowHeight;
+        }
+        finally { _loading = false; }
+    }
+
+    // ------------------------------------------------------------------
+    // 关于软件
+    // ------------------------------------------------------------------
+
+    private async void BtnAboutDetails_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await Launcher.LaunchUriAsync(new Uri(RepoUrl));
+        }
+        catch { /* 增强面:打不开浏览器就算了 */ }
+    }
+
+    // ------------------------------------------------------------------
+    // 告警
+    // ------------------------------------------------------------------
+
     private void AlertToggle_Changed(object sender, RoutedEventArgs e)
     {
+        SyncAlertThresholds();
         if (_loading) return;
         ApplyAlert();
     }
+
+    /// <summary>阈值行随开关收纳/展开(初态跟 cfg,切换即时跟随)。</summary>
+    private void SyncAlertThresholds()
+        => AlertThresholds.Visibility = AlertEnable.IsOn
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
     private void AlertNum_Changed(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
@@ -414,4 +667,11 @@ public sealed partial class SettingsPage : UserControl
         if (value.Length > 0) d[key] = value;
         else d.Remove(key);
     }
+
+    /// <summary>修饰键状态:WinUI 的 KeyRoutedEventArgs 不带修饰键,走 Win32。</summary>
+    private static bool IsDown(int vk) => (GetKeyState(vk) & 0x8000) != 0;
+
+    private sealed record ThemeOption(string Text, string Value);
+
+    private sealed record LanguageOption(string Text, string Value);
 }

@@ -220,13 +220,10 @@ public sealed class TrayIconService : IDisposable
         var menu = CreatePopupMenu();
         if (menu == nint.Zero) return;
         AppendMenuW(menu, MF_STRING, new nint(1), "打开主面板");
-        AppendMenuW(menu, MF_STRING, new nint(2),
-            _app.Poller.IsGloballyPaused ? "恢复轮询" : "暂停轮询");
-        AppendMenuW(menu, MF_STRING, new nint(3), "立即刷新");
-        AppendMenuW(menu, MF_STRING, new nint(4), "切换小组件");
+        AppendMenuW(menu, MF_STRING, new nint(2), "切换小组件");
         AppendMenuW(menu, MF_SEPARATOR, nint.Zero, null);
-        AppendMenuW(menu, MF_STRING, new nint(5), "设置");
-        AppendMenuW(menu, MF_STRING, new nint(6), "退出");
+        AppendMenuW(menu, MF_STRING, new nint(3), "设置");
+        AppendMenuW(menu, MF_STRING, new nint(4), "退出");
         GetCursorPos(out var pt);
         // TrackPopupMenu 前必须 SetForegroundWindow,否则菜单点外部不消失(经典坑)
         SetForegroundWindow(hWnd);
@@ -237,18 +234,10 @@ public sealed class TrayIconService : IDisposable
         switch (cmd)
         {
             case 1: try { _main.RestoreFromTray(); } catch { } break;
-            case 2: TogglePoll(); break;
-            case 3: _ = _app.Poller.RefreshNowAsync(); break;
-            case 4: try { _main.ToggleWidget(); } catch { } break;
-            case 5: try { _main.RestoreFromTray(); _main.GoSettings(); } catch { } break;
-            case 6: try { _main.Close(); } catch { } break;
+            case 2: try { _main.ToggleWidget(); } catch { } break;
+            case 3: try { _main.RestoreFromTray(); _main.GoSettings(); } catch { } break;
+            case 4: try { _main.Close(); } catch { } break;
         }
-    }
-
-    private void TogglePoll()
-    {
-        var paused = _app.Poller.ToggleGlobalPause();
-        if (!paused) _ = _app.Poller.RefreshNowAsync();
     }
 
     // ------------------------------------------------------------------

@@ -1,5 +1,6 @@
 using AgentEye.Core.Cache;
 using AgentEye.Core.Config;
+using AgentEye.Core.Hotkeys;
 using AgentEye.Core.Providers;
 
 namespace AgentEye.WinUI.Services;
@@ -92,6 +93,98 @@ public sealed class AppServices
     {
         var ui = UiDict();
         ui["theme"] = choice;
+    }
+
+    /// <summary>
+    /// 全局快捷键组合文本(ui.hotkey)。
+    /// 键不存在 → 默认 Ctrl+Shift+A;键存在但为空 → 用户主动"清除"(热键停用)。
+    /// </summary>
+    public string HotkeyText
+    {
+        get
+        {
+            var ui = UiDict();
+            if (!ui.TryGetValue("hotkey", out var h)) return HotkeySpec.DefaultText;
+            return h is string hs ? hs.Trim() : HotkeySpec.DefaultText;
+        }
+    }
+
+    /// <summary>全局快捷键开关(ui.hotkey_enabled);缺省开启。</summary>
+    public bool HotkeyEnabled
+    {
+        get
+        {
+            var ui = UiDict();
+            if (ui.TryGetValue("hotkey_enabled", out var e) && e is bool b) return b;
+            return true;
+        }
+    }
+
+    /// <summary>组合是否可用:开关打开 + 文本非空 + 能解析。</summary>
+    public bool HotkeyUsable =>
+        HotkeyEnabled &&
+        HotkeyText.Length > 0 &&
+        HotkeySpec.TryParse(HotkeyText, out _, out _);
+
+    public void SetHotkey(string text, bool enabled)
+    {
+        var ui = UiDict();
+        ui["hotkey"] = text;
+        ui["hotkey_enabled"] = enabled;
+    }
+
+    /// <summary>开机自启动开关的镜像值;真实状态以注册表 Run 键为准。</summary>
+    public bool Autostart
+    {
+        get
+        {
+            var ui = UiDict();
+            if (ui.TryGetValue("autostart", out var a) && a is bool b) return b;
+            return false;
+        }
+    }
+
+    public void SetAutostart(bool enabled) => UiDict()["autostart"] = enabled;
+
+    /// <summary>界面语言(ui.language);1.3.0 起支持中英切换。</summary>
+    public string Language
+    {
+        get
+        {
+            var ui = UiDict();
+            if (ui.TryGetValue("language", out var l) && l is string ls && ls.Length > 0)
+                return ls;
+            return "zh-Hans";
+        }
+    }
+
+    public void SetLanguage(string language) => UiDict()["language"] = language;
+
+    /// <summary>主窗口初始尺寸(物理像素,ui.width/ui.height)。</summary>
+    public int WindowWidth => IntOr(UiDict(), "width", 420);
+
+    public int WindowHeight => IntOr(UiDict(), "height", 560);
+
+    public void SetWindowSize(int width, int height)
+    {
+        var ui = UiDict();
+        ui["width"] = (double)width;
+        ui["height"] = (double)height;
+    }
+
+    private static int IntOr(Dictionary<string, object?> ui, string key, int fallback)
+    {
+        if (!ui.TryGetValue(key, out var v) || v is null) return fallback;
+        try
+        {
+            var d = Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture);
+            if (double.IsNaN(d) || double.IsInfinity(d)) return fallback;
+            return (int)Math.Round(d);
+        }
+        catch
+        {
+            return fallback;
+        }
     }
 
     public Dictionary<string, object?> UiDict()
