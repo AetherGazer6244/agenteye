@@ -48,7 +48,7 @@ public sealed partial class SettingsPage : UserControl
         new("深色", "dark"),
     ];
 
-    // 1.2.0 只落库不切换;中英双语自 1.3.0 起生效
+    // 1.2.1 只落库不切换;中英双语自 1.3.0 起生效
     private readonly List<LanguageOption> _languageOptions =
     [
         new("简体中文", "zh-Hans"),
@@ -75,6 +75,31 @@ public sealed partial class SettingsPage : UserControl
         ShowListPane();
         LoadGeneral();
         ReloadList();
+        // 热键当前注册失败(组合被别的程序占用)时提示一次;
+        // 启动阶段不弹——增强面静默降级,别在开机时打扰用户
+        var status = _main.HotkeyStatus;
+        if (status.StartsWith("注册失败", StringComparison.Ordinal))
+            _ = ShowErrorAsync("快捷键未生效", status);
+    }
+
+    /// <summary>错误提示走弹窗(设置页不保留常驻状态小字)。</summary>
+    private async Task ShowErrorAsync(string title, string message)
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = title,
+                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                CloseButtonText = "好",
+            };
+            await dialog.ShowAsync();
+        }
+        catch
+        {
+            // 弹不出来(无 XamlRoot 等):静默,不崩主流程
+        }
     }
 
     // ------------------------------------------------------------------
@@ -88,13 +113,9 @@ public sealed partial class SettingsPage : UserControl
         {
             ThemeCombo.SelectedIndex = Math.Max(0, _themeOptions.FindIndex(o => o.Value == _app.ThemeChoice));
             AutostartSwitch.IsOn = StartupService.IsEnabled();
-            AutostartStatusText.Text = StartupService.IsEnabled()
-                ? $"已登记:{StartupService.CurrentCommand()}"
-                : "";
             LanguageCombo.SelectedIndex = 0;
 
             HotkeyBox.Text = _app.HotkeyText;
-            HotkeyStatusText.Text = _main.HotkeyStatus;
 
             var alert = _app.AlertDict();
             AlertEnable.IsOn = alert.TryGetValue("enable", out var en) && en is true;
@@ -141,9 +162,6 @@ public sealed partial class SettingsPage : UserControl
         {
             _app.SetAutostart(want);
             _app.TrySaveCfg();
-            AutostartStatusText.Text = want
-                ? $"已登记:{StartupService.CurrentCommand()}"
-                : "已关闭开机自启动";
         }
         else
         {
@@ -151,12 +169,12 @@ public sealed partial class SettingsPage : UserControl
             _loading = true;
             AutostartSwitch.IsOn = !want;
             _loading = false;
-            AutostartStatusText.Text = error ?? "写入启动项失败";
+            _ = ShowErrorAsync("无法设置开机自启动", error ?? "写入启动项失败");
         }
     }
 
     // ------------------------------------------------------------------
-    // 语言(1.2.0 先落库,中英双语 1.3.0 起可切)
+    // 语言(1.2.1 先落库,中英双语 1.3.0 起可切)
     // ------------------------------------------------------------------
 
     private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -205,7 +223,7 @@ public sealed partial class SettingsPage : UserControl
         if (!HotkeySpec.TryFromVirtualKey((int)e.Key, mods, out var spec, out var error) ||
             spec is null)
         {
-            HotkeyStatusText.Text = error;
+            _ = ShowErrorAsync("组合无效", error ?? "请按字母/数字/功能键");
             return;
         }
         ApplyHotkey(spec.ToText(), true);
@@ -225,7 +243,7 @@ public sealed partial class SettingsPage : UserControl
     private bool HotkeyBoxUntouched =>
         string.Equals(HotkeyBox.Text.Trim(), _app.HotkeyText, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>提交手打文本:非法当场提示并回滚,不写坏值。</summary>
+    /// <summary>提交手打文本:非法当场弹窗提示并回滚,不写坏值。</summary>
     private void CommitHotkeyText()
     {
         var text = HotkeyBox.Text.Trim();
@@ -236,8 +254,8 @@ public sealed partial class SettingsPage : UserControl
         }
         if (!HotkeySpec.TryParse(text, out var spec, out var error) || spec is null)
         {
-            HotkeyStatusText.Text = $"组合无效:{error}(例如 Ctrl+Shift+A)";
             HotkeyBox.Text = _app.HotkeyText;
+            _ = ShowErrorAsync("组合无效", $"{error}(例如 Ctrl+Shift+A)");
             return;
         }
         ApplyHotkey(spec.ToText(), true);
@@ -249,7 +267,10 @@ public sealed partial class SettingsPage : UserControl
         _app.TrySaveCfg();
         _main.ApplyHotkey();
         HotkeyBox.Text = _app.HotkeyText;
-        HotkeyStatusText.Text = _main.HotkeyStatus;
+        // 注册失败(被别的程序占用)才提示;成功静默,界面不留状态小字
+        var status = _main.HotkeyStatus;
+        if (status.StartsWith("注册失败", StringComparison.Ordinal))
+            _ = ShowErrorAsync("快捷键未生效", status);
     }
 
     private void BtnClearHotkey_Click(object sender, RoutedEventArgs e)

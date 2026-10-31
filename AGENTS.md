@@ -145,7 +145,7 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   `ui.hotkey_enabled`(开关,默认 true);组合文本只在 `ui` 自由字典里加键,
   `schema_version` 仍是 2,Python 版 merge 会保留未知键,不受影响。
 - 开机自启:`ui.autostart` 只是镜像值,**真实状态以注册表为准**;
-  `ui.language`(默认 "zh-Hans")1.2.0 只落库不切换,中英双语 1.3.0 起生效。
+  `ui.language`(默认 "zh-Hans")1.2.1 只落库不切换,中英双语 1.3.0 起生效。
 
 ## 设置页版式契约(卡片行模板)
 
@@ -157,6 +157,8 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   控件列放不下时先裁标题,不许用固定宽横排 StackPanel。
 - 新样式只复用已有主题令牌(AeCardBrush / AeCardStrokeBrush /
   AeTextSecondaryBrush),要新颜色必须 Light/Dark 两边都加。
+- **设置页不保留常驻状态小字**(热键「已生效…」、自启「已登记:…」一律不要);
+  错误一律走弹窗(`ContentDialog`),成功静默。
 
 ## 开机自启契约
 
@@ -165,7 +167,7 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   那条同键同格式**,否则两边互相看不见对方的开关。
 - `--minimized` 由 `App.xaml.cs` 解析:建窗后 `AppWindow.Hide()`,静默进
   托盘(托盘/小组件照常);不带参数则正常显示主面板。
-- 注册表读写失败只回滚 UI 开关 + 落状态文案,不许崩主流程。
+- 注册表读写失败只回滚 UI 开关 + 弹窗提示,不许崩主流程。
 
 ## 全局快捷键契约
 
@@ -177,7 +179,7 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   消息 `WM_APP_APPLY` 交给热键线程执行,调用方等 `ManualResetEventSlim`。
 - 至少要有一个修饰键(Ctrl/Alt/Shift/Win):裸键会劫持日常打字,解析层
   直接拒绝。
-- 组合被别的程序占用(1409)只落 `HotkeyService.Status` 文案,设置页回显,
+- 组合被别的程序占用(1409)只落 `HotkeyService.Status` 文案,设置页**弹窗**提示,
   应用照常运行——不许因此崩主流程(增强面契约)。
 - 设置页「录制」:文本框既可手打(解析器大小写不敏感),也可**直接按组合键**
   录入——但只有"输入框内容仍是已保存的值"时按键才算录入,用户一旦手动改字

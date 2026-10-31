@@ -8,8 +8,8 @@
     <RootNamespace>AgentEye</RootNamespace>
     <AssemblyName>AgentEye</AssemblyName>
     <!-- 应用版本:更新检查拿它跟 GitHub release 的 tag 比对 -->
-    <Version>1.2.0</Version>
-    <FileVersion>1.2.0.0</FileVersion>
+    <Version>1.2.1</Version>
+    <FileVersion>1.2.1.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- 应用图标(A 标 + 瞳孔,托盘蓝):内嵌进 exe,
          资源管理器/任务栏/快捷方式/卸载项/toast 全部跟着变 -->

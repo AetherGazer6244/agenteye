@@ -47,15 +47,12 @@
                         <TextBlock Text="开机自动在后台运行(静默进托盘,不弹主面板)"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
-                        <ToggleSwitch x:Name="AutostartSwitch" Grid.Column="2"
+                    <ToggleSwitch x:Name="AutostartSwitch" Grid.Column="2"
                                   MinWidth="0" OnContent="已启用" OffContent="已关闭"
                                   VerticalAlignment="Center"
                                   Toggled="AutostartSwitch_Toggled" />
                 </Grid>
             </Border>
-            <TextBlock x:Name="AutostartStatusText" FontSize="12" TextWrapping="Wrap"
-                       Margin="4,0,0,0"
-                       Foreground="{ThemeResource AeTextSecondaryBrush}" />
 
             <!-- 语言 -->
             <Border Style="{StaticResource AeSettingsItemStyle}">
@@ -106,9 +103,6 @@
                     </StackPanel>
                 </Grid>
             </Border>
-            <TextBlock x:Name="HotkeyStatusText" FontSize="12" TextWrapping="Wrap"
-                       Margin="4,0,0,0"
-                       Foreground="{ThemeResource AeTextSecondaryBrush}" />
 
             <!-- 告警 -->
             <TextBlock Text="告警" Style="{StaticResource AeSectionHeaderStyle}" />
