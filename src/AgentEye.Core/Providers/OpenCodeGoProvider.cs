@@ -1,4 +1,6 @@
-﻿namespace AgentEye.Core.Providers;
+﻿using AgentEye.Core.Localization;
+
+namespace AgentEye.Core.Providers;
 
 /// <summary>
 /// OpenCode Go(zen/go)订阅额度(端口自 opencode_go.py)。
@@ -15,11 +17,11 @@ public static class OpenCodeGoProvider
     // 所以必须留一条回退到正确路径。
     private static readonly string[] UrlVariants = ["https://opencode.ai/zen/go/v1/usage"];
 
-    private static readonly (string Key, string Label, double Limit)[] Windows =
+    private static readonly (string Key, string LabelKey, double Limit)[] Windows =
     [
-        ("rolling", "5h", 12.0),
-        ("weekly", "周", 30.0),
-        ("monthly", "月", 60.0),
+        ("rolling", "oc.5h", 12.0),
+        ("weekly", "oc.week", 30.0),
+        ("monthly", "oc.month", 60.0),
     ];
 
     /// <summary>percent 视为 0-100 的剩余百分比,钳到 [0,100]。</summary>
@@ -43,7 +45,7 @@ public static class OpenCodeGoProvider
     {
         var key = e.ApiKey ?? "";
         if (key.Length == 0)
-            return FetchPayload.Err("未配置 api_key", unconfigured: true);
+            return FetchPayload.Err(L.T("pr.noKey"), unconfigured: true);
 
         var headers = new Dictionary<string, string>
         {
@@ -58,10 +60,10 @@ public static class OpenCodeGoProvider
         {
             var (ok, status, respBody) = await Http.GetJsonAsync(
                 urls[i], headers, Http.DefaultTimeoutSec, ct);
-            if (!ok) return FetchPayload.Err("网络错误: 网络异常");
+            if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
             if (status == 401)
                 // 鉴权层拒绝与路径无关,不需要回退
-                return FetchPayload.Err("key 无效 (HTTP 401)");
+                return FetchPayload.Err(L.F("pr.keyInvalid", 401));
             if (status == 200)
             {
                 body = respBody;
@@ -77,10 +79,10 @@ public static class OpenCodeGoProvider
         }
         if (!haveBody)
         {
-            if (lastStatus == 403) return FetchPayload.Err("key 无效 (HTTP 403)");
+            if (lastStatus == 403) return FetchPayload.Err(L.F("pr.keyInvalid", 403));
             return FetchPayload.Err($"HTTP {lastStatus}");
         }
-        if (!Http.IsObj(body)) return FetchPayload.Err("响应非 JSON");
+        if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));
 
         var usageEl = Http.Obj(body, "usage");
         var usage = usageEl is { } u && u.ValueKind == System.Text.Json.JsonValueKind.Object
@@ -88,7 +90,7 @@ public static class OpenCodeGoProvider
         var parts = new List<string>();
         var pcts = new List<double>();
         var resets = new List<string>();
-        foreach (var (wkey, label, limit) in Windows)
+        foreach (var (wkey, labelKey, limit) in Windows)
         {
             var wEl = Http.Obj(usage, wkey);
             if (wEl is not { } w || w.ValueKind != System.Text.Json.JsonValueKind.Object)
@@ -96,13 +98,13 @@ public static class OpenCodeGoProvider
             var p = NormPct(Http.Num(w, "percent"));
             if (p is null) continue;
             var amt = p.Value / 100.0 * limit;
-            parts.Add($"{label} 剩≈${Http.F2(amt)}/${limit:F0}");
+            parts.Add(L.F("oc.seg", L.T(labelKey), Http.F2(amt), $"{limit:F0}"));
             pcts.Add(p.Value);
             var resetsAt = Http.Str(w, "resetsAt");
             if (resetsAt is not null) resets.Add(resetsAt);
         }
 
-        if (pcts.Count == 0) return FetchPayload.Err("响应无窗口数据");
+        if (pcts.Count == 0) return FetchPayload.Err(L.T("oc.noWindows"));
 
         double? monthlyAmt = null;
         var mEl = Http.Obj(usage, "monthly");
@@ -111,7 +113,7 @@ public static class OpenCodeGoProvider
             monthlyAmt = mp / 100.0 * 60.0;
 
         var resetNote = "";
-        if (resets.Count > 0) resetNote = $" · 重置 {IsoIn(resets[0])}";
+        if (resets.Count > 0) resetNote = L.F("pr.reset", IsoIn(resets[0]));
 
         // used 必须回填:面板胶囊的长度/颜色吃 used/total。percent 按
         // "剩余"解读,monthly_amt 是"月窗口剩余换算",已用就是 60 - 月剩余。
@@ -138,7 +140,7 @@ public static class OpenCodeGoProvider
                 out var dt))
             return "?";
         var sec = (long)(dt - DateTimeOffset.UtcNow).TotalSeconds;
-        if (sec <= 0) return "已重置";
+        if (sec <= 0) return L.T("oc.resetDone");
         var h = sec / 3600;
         var m = sec % 3600 / 60;
         return h > 0 ? $"{h}h{m:D2}m" : $"{m}m";

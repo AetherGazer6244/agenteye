@@ -1,3 +1,5 @@
+using AgentEye.Core.Localization;
+
 namespace AgentEye.Core.Providers;
 
 /// <summary>智谱 GLM 额度窗口(端口自 zhipu.py)。</summary>
@@ -9,7 +11,7 @@ public static class ZhipuProvider
     private static readonly Dictionary<(int Unit, int Number), string> WindowLabels = new()
     {
         [(3, 5)] = "5h",
-        [(6, 1)] = "周",
+        [(6, 1)] = "zp.week",
     };
 
     private static string? FmtResetAbs(double? ms)
@@ -31,7 +33,7 @@ public static class ZhipuProvider
     {
         var key = e.ApiKey ?? "";
         if (key.Length == 0)
-            return FetchPayload.Err("未配置 api_key", unconfigured: true);
+            return FetchPayload.Err(L.T("pr.noKey"), unconfigured: true);
 
         var bas = string.IsNullOrEmpty(e.BaseUrl) ? DefaultBase : e.BaseUrl.TrimEnd('/');
         var (ok, status, body) = await Http.GetJsonAsync(bas + Path,
@@ -41,10 +43,10 @@ public static class ZhipuProvider
                 ["Authorization"] = key,
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return FetchPayload.Err("网络错误: 网络异常");
-        if (status is 401 or 403) return FetchPayload.Err($"key 无效 (HTTP {status})");
+        if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
+        if (status is 401 or 403) return FetchPayload.Err(L.F("pr.keyInvalid", status));
         if (status != 200) return FetchPayload.Err($"HTTP {status}");
-        if (!Http.IsObj(body)) return FetchPayload.Err("响应非 JSON");
+        if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));
 
         // 智谱个别网关把 code 回成字符串 "200",不能直接按数字比
         var code = Http.Obj(body, "code");
@@ -56,7 +58,7 @@ public static class ZhipuProvider
         };
         var success = Http.Obj(body, "success") is { ValueKind: System.Text.Json.JsonValueKind.False };
         if ((codeStr is not null && codeStr != "200") || success)
-            return FetchPayload.Err($"接口报错: {Http.Str(body, "msg") ?? codeStr ?? "?"}");
+            return FetchPayload.Err(L.F("pr.apiError", Http.Str(body, "msg") ?? codeStr ?? "?"));
 
         var data = Http.Obj(body, "data") is { ValueKind: System.Text.Json.JsonValueKind.Object }
             ? Http.Obj(body, "data")!.Value : default;
@@ -66,19 +68,19 @@ public static class ZhipuProvider
                         && Http.Str(l, "type") == "TOKENS_LIMIT"
                         && Http.Num(l, "percentage") is not null)
             .ToList();
-        if (tokenLimits.Count == 0) return FetchPayload.Err("无 token 额度窗口");
+        if (tokenLimits.Count == 0) return FetchPayload.Err(L.T("zp.noWindows"));
 
         var segs = new List<(double Rem, string Seg)>();
         foreach (var l in tokenLimits)
         {
             var unit = (int?)Http.Num(l, "unit") ?? 0;
             var number = (int?)Http.Num(l, "number") ?? 0;
-            var label = WindowLabels.GetValueOrDefault((unit, number), $"{number}·u{unit}");
+            var label = L.T(WindowLabels.GetValueOrDefault((unit, number), $"{number}·u{unit}"));
             var used = Http.Num(l, "percentage")!.Value;
             var rem = Math.Max(0.0, 100.0 - used);
-            var seg = $"{label} 剩{Http.F0(rem)}%";
+            var seg = L.F("zp.seg", label, Http.F0(rem));
             var reset = FmtResetAbs(Http.Num(l, "nextResetTime"));
-            if (reset is not null) seg += $"(重置{reset})";
+            if (reset is not null) seg += L.F("zp.segReset", reset);
             segs.Add((rem, seg));
         }
 
@@ -89,7 +91,7 @@ public static class ZhipuProvider
 
         var level = Http.Str(data, "level");
         var detail = string.Join(" · ", parts);
-        if (level is not null) detail += $" · {level}套餐";
+        if (level is not null) detail += L.F("zp.plan", level);
 
         return new FetchPayload
         {

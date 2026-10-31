@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 
 namespace AgentEye.Core.Update;
@@ -20,7 +21,7 @@ public static class UpdateDownloader
         cts.CancelAfter(TimeSpan.FromMinutes(10));
         using var resp = await Http.Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         if (!resp.IsSuccessStatusCode)
-            throw new IOException($"下载失败 HTTP {(int)resp.StatusCode}");
+            throw new IOException(L.F("dl.http", (int)resp.StatusCode));
         var total = resp.Content.Headers.ContentLength ?? 0;
         await using var src = await resp.Content.ReadAsStreamAsync(cts.Token);
         await using var dst = new FileStream(destFile, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -36,7 +37,7 @@ public static class UpdateDownloader
         await dst.FlushAsync(cts.Token);
         dst.Flush(flushToDisk: true);
         if (total > 0 && done != total)
-            throw new IOException($"下载不完整({done}/{total} 字节)");
+            throw new IOException(L.F("dl.incomplete", done, total));
         return destFile;
     }
 

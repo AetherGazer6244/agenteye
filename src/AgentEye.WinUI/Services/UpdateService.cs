@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AgentEye.Core.Cache;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.Core.Update;
 using Microsoft.UI.Xaml;
@@ -85,7 +86,7 @@ public sealed class UpdateService
     /// <summary>检查更新。silent=true 时不弹 toast。</summary>
     public async Task<UpdateState> CheckAsync(bool silent = false)
     {
-        Publish(new UpdateState { Busy = true, Message = "正在检查更新…" });
+        Publish(new UpdateState { Busy = true, Message = L.T("update.checking") });
         UpdateCheckResult result;
         try
         {
@@ -94,7 +95,7 @@ public sealed class UpdateService
         catch (Exception e)
         {
             result = new UpdateCheckResult(UpdateCheckStatus.NetworkError, null,
-                $"检查更新失败:{e.Message}");
+                L.F("update.checkFailed", e.Message));
         }
         _result = result;
         try { _cache.SaveUpdateLastCheck(Http.Now()); } catch (Exception) { }
@@ -108,11 +109,11 @@ public sealed class UpdateService
                 LatestVersion = state.LatestVersion,
                 ReleaseUrl = state.ReleaseUrl,
                 UpToDate = false,
-                Message = $"{state.Message}(已忽略此版本)",
+                Message = L.F("update.ignoredSuffix", state.Message),
             };
         Publish(state);
         if (state.HasUpdate && !silent)
-            await _app.Notify.ShowAsync("发现新版本", state.Message);
+            await _app.Notify.ShowAsync(L.T("update.toastTitle"), state.Message);
         return state;
     }
 
@@ -173,13 +174,13 @@ public sealed class UpdateService
         IProgress<int>? progress = null, CancellationToken ct = default)
     {
         var release = _result?.Release;
-        if (release is null) return "尚未检查到新版本";
+        if (release is null) return L.T("update.noneFound");
         var asset = UpdateChecker.SelectAsset(release.Assets);
-        if (asset is null) return "release 里没有可用的 AgentEye_Setup.exe 安装包";
+        if (asset is null) return L.T("update.noAsset");
 
         var installDir = AppContext.BaseDirectory.TrimEnd('\\');
         if (!UpdateApplier.IsDirectoryWritable(installDir))
-            return $"安装目录不可写({installDir}),请重新运行安装器手动修复";
+            return L.F("update.dirReadOnly", installDir);
 
         var workDir = UpdateApplier.WorkDir(Path.GetTempPath(), release.VersionText);
         var setupPath = Path.Combine(workDir, asset.Name);
@@ -192,7 +193,7 @@ public sealed class UpdateService
                 LatestVersion = release.VersionText,
                 ReleaseUrl = release.HtmlUrl,
                 Busy = true,
-                Message = $"正在下载 {asset.Name}…",
+                Message = L.F("update.downloadingAsset", asset.Name),
             });
 
             await UpdateDownloader.DownloadAsync(asset.Url, setupPath, new Progress<long>(n =>
@@ -202,7 +203,7 @@ public sealed class UpdateService
             }), ct);
 
             if (!UpdateDownloader.VerifySha256(setupPath, asset.Sha256))
-                return "安装包校验失败(sha256 不匹配),已放弃更新";
+                return L.T("update.badChecksum");
 
             Publish(new UpdateState
             {
@@ -211,7 +212,7 @@ public sealed class UpdateService
                 ReleaseUrl = release.HtmlUrl,
                 Busy = true,
                 Progress = 100,
-                Message = "正在启动安装器,应用将被关闭并自动重启…",
+                Message = L.T("update.launching"),
             });
             Process.Start(new ProcessStartInfo(setupPath, UpdateApplier.SilentInstallArgs)
             {
@@ -221,13 +222,13 @@ public sealed class UpdateService
         }
         catch (OperationCanceledException)
         {
-            Publish(new UpdateState { Message = "已取消更新" });
-            return "已取消更新";
+            Publish(new UpdateState { Message = L.T("update.cancelled") });
+            return L.T("update.cancelled");
         }
         catch (Exception e)
         {
-            Publish(new UpdateState { Message = $"更新失败:{e.Message}" });
-            return $"更新失败:{e.Message}";
+            Publish(new UpdateState { Message = L.F("update.failed", e.Message) });
+            return L.F("update.failed", e.Message);
         }
     }
 

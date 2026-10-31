@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AgentEye.Core.Hotkeys;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Security;
 
 namespace AgentEye.Core.Config;
@@ -185,7 +186,7 @@ public sealed class ConfigStore
             .ToList();
         if (leaked.Count > 0)
             throw new PlaintextKeyError(
-                "拒绝写盘:以下 provider 的 key 未能加密(DPAPI 不可用?)——" +
+                L.T("cfg.plaintextPrefix") +
                 string.Join(", ", leaked));
         return data;
     }
@@ -259,7 +260,7 @@ public sealed class ConfigStore
         }
         else
         {
-            warnings.Add($"配置里 providers 不是列表(实际 {raw.GetType().Name}),已置空");
+            warnings.Add(L.F("cfg.providersNotList", raw.GetType().Name));
             cfg["providers"] = new List<object?>();
             return;
         }
@@ -271,7 +272,7 @@ public sealed class ConfigStore
             else bad++;
         }
         if (bad > 0)
-            warnings.Add($"配置里 providers 有 {bad} 个非对象条目,已丢弃(provider 必须是 {{...}} 对象)");
+            warnings.Add(L.F("cfg.providersBadEntries", bad));
         cfg["providers"] = good;
     }
 
@@ -367,18 +368,18 @@ public sealed class ConfigStore
         var backup = BackupPath;
         if (File.Exists(backup)) return;
         if (!DpapiCrypt.IsAvailable)
-            throw new ConfigError("DPAPI 不可用,已中止 v1 迁移:备份会写出明文密钥");
+            throw new ConfigError(L.T("cfg.migrateDpapi"));
         var blob = JsonUtil.DumpCompact(userCfg);
         var enc = DpapiCrypt.Protect(blob);
         if (enc is null)
-            throw new ConfigError("v1 备份加密失败,已中止迁移:不愿写出明文密钥");
+            throw new ConfigError(L.T("cfg.migrateBackupEnc"));
         try
         {
             AtomicSave(backup, new Dictionary<string, object?> { [V1BackupMark] = enc });
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            throw new ConfigError($"无法写入 v1 备份({e.Message}),已中止迁移以免密钥丢失");
+            throw new ConfigError(L.F("cfg.migrateBackupWrite", e.Message));
         }
     }
 
@@ -387,18 +388,17 @@ public sealed class ConfigStore
     {
         var backup = BackupPath;
         if (!File.Exists(backup))
-            throw new ConfigError($"没有备份文件:{backup}");
+            throw new ConfigError(L.F("cfg.noBackup", backup));
         var data = JsonUtil.ParseObject(File.ReadAllText(backup))
-            ?? throw new ConfigError($"{backup} 不是本程序写的加密备份");
+            ?? throw new ConfigError(L.F("cfg.notOurBackup", backup));
         if (data.TryGetValue(V1BackupMark, out var encObj) && encObj is string enc)
         {
             var raw = DpapiCrypt.Unprotect(enc)
-                ?? throw new ConfigError(
-                    $"{backup} 解密失败:DPAPI 绑定当前用户,换账户/换机器无法恢复");
+                ?? throw new ConfigError(L.F("cfg.backupDecrypt", backup));
             return JsonUtil.ParseObject(raw)
-                ?? throw new ConfigError($"{backup} 解密后的内容不是合法 JSON");
+                ?? throw new ConfigError(L.F("cfg.backupNotJson", backup));
         }
-        throw new ConfigError($"{backup} 不是本程序写的加密备份");
+        throw new ConfigError(L.F("cfg.notOurBackup", backup));
     }
 
     private string BackupPath => Path.ChangeExtension(ConfigPath, ".v1.bak");
@@ -461,7 +461,7 @@ public sealed class ConfigStore
                     Thread.Sleep(150 * (attempt + 1));
             }
         }
-        throw new ConfigError($"配置保存失败(文件被占用?):{last?.Message}");
+        throw new ConfigError(L.F("cfg.saveLocked", last?.Message));
     }
 
     // ------------------------------------------------------------------
@@ -518,10 +518,8 @@ public sealed class ConfigStore
                     Thread.Sleep(ReadRetryDelay * (attempt + 1));
             }
         }
-        throw new ConfigError(
-            $"无法读取配置文件 {ConfigPath}({last?.GetType().Name}: {last?.Message})。" +
-            "请关闭正在占用它的程序(记事本/编辑器/另一个 AgentEye 实例)后重试;" +
-            "为避免覆盖你的配置,本次不做任何写入。");
+        throw new ConfigError(L.F("cfg.readLocked",
+            ConfigPath, last?.GetType().Name, last?.Message));
     }
 
     public LoadOutcome LoadV2()
@@ -543,12 +541,12 @@ public sealed class ConfigStore
         }
         catch (System.Text.DecoderFallbackException e)
         {
-            return QuarantineAndReturnTemplate($"字节流不是合法 UTF-8({e.Message})");
+            return QuarantineAndReturnTemplate(L.F("cfg.badUtf8", e.Message));
         }
 
         var userCfg = JsonUtil.ParseObject(text);
         if (userCfg is null)
-            return QuarantineAndReturnTemplate("根节点不是对象或 JSON 解析失败");
+            return QuarantineAndReturnTemplate(L.T("cfg.badJson"));
 
         var version = userCfg.TryGetValue("schema_version", out var v) ? v : null;
         if (version is int vi && vi == SchemaVersion)
@@ -570,8 +568,7 @@ public sealed class ConfigStore
 
         if (version is int high && high > SchemaVersion)
             throw new ConfigVersionError(
-                $"配置版本 schema_version={high} 高于本程序支持的 {SchemaVersion}。" +
-                "请升级 AgentEye,或手动改回 2。");
+                L.F("cfg.versionTooNew", high, SchemaVersion));
 
         // 只有缺版本号 / 整型 1 才走 v1 迁移;版本字段类型不对(字符串"2"、
         // true 等)按损坏隔离,绝不能落进迁移把 providers 清空。
@@ -586,14 +583,14 @@ public sealed class ConfigStore
             return new LoadOutcome(migrated, warnings, null, FreshInstall: false);
         }
 
-        return QuarantineAndReturnTemplate($"schema_version 类型异常: {JsonUtil.FromClr(version)}");
+        return QuarantineAndReturnTemplate(L.F("cfg.versionBadType", JsonUtil.FromClr(version)));
     }
 
     private LoadOutcome QuarantineAndReturnTemplate(string reason)
     {
         var moved = QuarantineCorruptConfig(reason);
         if (moved is null)
-            reason += "(重命名失败,本次不会覆盖原文件)";
+            reason += L.T("cfg.renameFail");
         return new LoadOutcome(Template(), [reason], moved, FreshInstall: false);
     }
 

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.WinUI.Services;
 
@@ -219,11 +220,11 @@ public sealed class TrayIconService : IDisposable
     {
         var menu = CreatePopupMenu();
         if (menu == nint.Zero) return;
-        AppendMenuW(menu, MF_STRING, new nint(1), "打开主面板");
-        AppendMenuW(menu, MF_STRING, new nint(2), "切换小组件");
+        AppendMenuW(menu, MF_STRING, new nint(1), L.T("tray.open"));
+        AppendMenuW(menu, MF_STRING, new nint(2), L.T("tray.widget"));
         AppendMenuW(menu, MF_SEPARATOR, nint.Zero, null);
-        AppendMenuW(menu, MF_STRING, new nint(3), "设置");
-        AppendMenuW(menu, MF_STRING, new nint(4), "退出");
+        AppendMenuW(menu, MF_STRING, new nint(3), L.T("tray.settings"));
+        AppendMenuW(menu, MF_STRING, new nint(4), L.T("tray.exit"));
         GetCursorPos(out var pt);
         // TrackPopupMenu 前必须 SetForegroundWindow,否则菜单点外部不消失(经典坑)
         SetForegroundWindow(hWnd);
@@ -272,13 +273,13 @@ public sealed class TrayIconService : IDisposable
                 Levels.Unconfigured => 3, Levels.Paused => 4, _ => 5,
             }).First();
         if (worst is null)
-            return ("··", "empty", "AgentEye — 没有已接入的 provider");
+            return ("··", "empty", L.T("tray.tooltipEmpty"));
         if (worst.Level is Levels.Unconfigured or Levels.Error or Levels.Paused)
-            return ("!", $"{worst.Name}|{worst.Level}", $"AgentEye — {worst.Name}({worst.Level})");
+            return ("!", $"{worst.Name}|{worst.Level}", L.F("tray.tooltipLevel", worst.Name, worst.Level));
         var used = worst.Pct is null ? 0 : (int)Math.Round(100 - worst.Pct.Value);
         used = Math.Clamp(used, 0, 100);
         return (used.ToString(), $"{worst.Name}|{used}",
-            $"AgentEye — {worst.Name} 已用 {used}%");
+            L.F("tray.tooltipWorst", worst.Name, used));
     }
 
     /// <summary>托盘图标:应用 A 标 + 数字牌(渲染细节见 TrayIconRenderer)。</summary>

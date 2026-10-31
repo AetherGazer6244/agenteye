@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AgentEye.Core.Localization;
 using Microsoft.Win32;
 
 namespace AgentEye.WinUI.Services;
@@ -55,7 +56,7 @@ public static class StartupService
                             ?? Registry.CurrentUser.CreateSubKey(RunSubKey, writable: true);
             if (key is null)
             {
-                error = "无法打开启动项注册表";
+                error = L.T("startup.errOpen");
                 return false;
             }
             if (enabled)
@@ -70,12 +71,12 @@ public static class StartupService
         }
         catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException)
         {
-            error = "写入启动项被拒绝(权限不足?)";
+            error = L.T("startup.errDenied");
             return false;
         }
         catch (Exception e) when (e is IOException or ArgumentException)
         {
-            error = $"写入启动项失败:{e.Message}";
+            error = L.F("startup.errWrite", e.Message);
             return false;
         }
     }

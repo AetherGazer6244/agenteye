@@ -1,3 +1,4 @@
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.WinUI.Services;
 using Microsoft.UI;
@@ -222,7 +223,7 @@ public sealed class WidgetWindow : IDisposable
         {
             host.Children.Add(new TextBlock
             {
-                Text = "未接入 provider",
+                Text = L.T("widget.empty"),
                 FontSize = 11,
                 Opacity = 0.6,
             });
@@ -270,7 +271,7 @@ public sealed class WidgetWindow : IDisposable
         {
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center,
-            Text = r.Level is Levels.Unconfigured ? "未配置"
+            Text = r.Level is Levels.Unconfigured ? L.T("ov.unconfigured")
                 : r.Pct is not null ? $"{r.Pct:F0}%"
                 : r.Remaining is not null ? $"{r.Remaining:F2} {r.Unit}"
                 : "-",

@@ -1,3 +1,5 @@
+using AgentEye.Core.Localization;
+
 namespace AgentEye.Core.Hotkeys;
 
 /// <summary>
@@ -45,7 +47,7 @@ public sealed record HotkeySpec(int Modifiers, int VirtualKey)
         var raw = (text ?? "").Trim();
         if (raw.Length == 0)
         {
-            error = "快捷键为空";
+            error = L.T("hk.empty");
             return false;
         }
 
@@ -61,12 +63,12 @@ public sealed record HotkeySpec(int Modifiers, int VirtualKey)
             }
             if (!KeyNames.TryGetValue(part, out var vk))
             {
-                error = $"无法识别的按键:{part}";
+                error = L.F("hk.unknownKey", part);
                 return false;
             }
             if (key is not null)
             {
-                error = "只能有一个主键(如 A / F2 / Space)";
+                error = L.T("hk.multiMain");
                 return false;
             }
             key = vk;
@@ -74,12 +76,12 @@ public sealed record HotkeySpec(int Modifiers, int VirtualKey)
 
         if (key is null)
         {
-            error = "缺少主键(如 A / F2 / Space)";
+            error = L.T("hk.noMain");
             return false;
         }
         if (mods == 0)
         {
-            error = "至少需要一个修饰键(Ctrl / Alt / Shift / Win)";
+            error = L.T("hk.noMod");
             return false;
         }
 
@@ -94,22 +96,22 @@ public sealed record HotkeySpec(int Modifiers, int VirtualKey)
         spec = null;
         if (vk <= 0)
         {
-            error = "无效按键";
+            error = L.T("hk.invalidKey");
             return false;
         }
         if (vk is 0x10 or 0x11 or 0x12 or 0x5B or 0x5C)
         {
-            error = "请按字母/数字/功能键,不能只按修饰键";
+            error = L.T("hk.modOnly");
             return false;
         }
         if (!KeyCodes.ContainsKey(vk))
         {
-            error = $"暂不支持的按键(0x{vk:X2})";
+            error = L.F("hk.unsupported", vk.ToString("X2"));
             return false;
         }
         if (modifiers == 0)
         {
-            error = "至少需要一个修饰键(Ctrl / Alt / Shift / Win)";
+            error = L.T("hk.noMod");
             return false;
         }
         spec = new HotkeySpec(modifiers, vk);

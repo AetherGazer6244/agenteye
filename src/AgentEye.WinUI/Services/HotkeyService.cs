@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using AgentEye.Core.Hotkeys;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.WinUI.Services;
 
@@ -97,7 +98,7 @@ public sealed class HotkeyService : IDisposable
     private string _result = "";
 
     /// <summary>当前状态文案(设置页回显;失败原因也在这里)。</summary>
-    public string Status { get; private set; } = "未启用";
+    public string Status { get; private set; } = L.T("hotkey.stDisabled");
 
     public HotkeyService(Action onTriggered)
     {
@@ -172,7 +173,7 @@ public sealed class HotkeyService : IDisposable
             }
             string result;
             try { result = DoApply(text, enabled); }
-            catch { result = "热键设置失败"; }
+            catch { result = L.T("hotkey.applyFailed"); }
             _result = result;
             _applied.Set();
             return nint.Zero;
@@ -188,7 +189,7 @@ public sealed class HotkeyService : IDisposable
     {
         if (_disposed)
         {
-            Status = "热键服务已关闭";
+            Status = L.T("hotkey.stSvcClosed");
             return;
         }
         lock (_gate)
@@ -199,12 +200,12 @@ public sealed class HotkeyService : IDisposable
         _applied.Reset();
         if (!PostMessageW(_hwnd, WM_APP_APPLY, nint.Zero, nint.Zero))
         {
-            Status = "热键服务无响应";
+            Status = L.T("hotkey.stNoResponse");
             return;
         }
         if (!_applied.Wait(2000))
         {
-            Status = "热键设置超时";
+            Status = L.T("hotkey.stTimeout");
             return;
         }
         Status = _result;
@@ -214,19 +215,19 @@ public sealed class HotkeyService : IDisposable
     private string DoApply(string text, bool enabled)
     {
         Unregister();
-        if (!enabled) return "已关闭";
+        if (!enabled) return L.T("hotkey.stOff");
         if (!HotkeySpec.TryParse(text, out var spec, out var error) || spec is null)
-            return $"组合无效:{error}";
+            return L.F("hotkey.stInvalid", error);
         var mods = (uint)(spec.Modifiers | MOD_NOREPEAT);
         if (!RegisterHotKey(_hwnd, HotkeyId, mods, (uint)spec.VirtualKey))
         {
             var err = Marshal.GetLastWin32Error();
             return err == ErrorHotkeyAlready
-                ? "注册失败(该组合已被其它程序占用)"
-                : $"注册失败(错误 {err})";
+                ? L.T("hotkey.stInUse")
+                : L.F("hotkey.stRegError", err);
         }
         _registered = true;
-        return $"已生效:{spec.ToText()}";
+        return L.F("hotkey.stActive", spec.ToText());
     }
 
     private void Unregister()

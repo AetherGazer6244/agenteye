@@ -131,8 +131,8 @@ public sealed partial class SettingsPage : UserControl
         // 热键当前注册失败(组合被别的程序占用)时提示一次;
         // 启动阶段不弹——增强面静默降级,别在开机时打扰用户
         var status = _main.HotkeyStatus;
-        if (status.StartsWith("注册失败", StringComparison.Ordinal))
-            _ = ShowErrorAsync("快捷键未生效", status);
+        if (status.StartsWith(L.T("hotkey.regFailPrefix"), StringComparison.Ordinal))
+            _ = ShowErrorAsync(L.T("hotkey.notEffective"), status);
     }
 
     /// <summary>错误提示走弹窗(设置页不保留常驻状态小字)。</summary>
@@ -145,7 +145,7 @@ public sealed partial class SettingsPage : UserControl
                 XamlRoot = XamlRoot,
                 Title = title,
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-                CloseButtonText = "好",
+                CloseButtonText = L.T("common.close"),
             };
             await dialog.ShowAsync();
         }
@@ -181,8 +181,8 @@ public sealed partial class SettingsPage : UserControl
             WidthBox.Value = _app.WindowWidth;
             HeightBox.Value = _app.WindowHeight;
 
-            VersionText.Text = $"当前版本 v{UpdateService.CurrentVersion}" +
-                               $"(更新源 github.com/{UpdateChecker.Owner}/{UpdateChecker.Repo})";
+            VersionText.Text = L.F("update.versionLine",
+                UpdateService.CurrentVersion, UpdateChecker.Owner, UpdateChecker.Repo);
         }
         finally
         {
@@ -224,7 +224,8 @@ public sealed partial class SettingsPage : UserControl
             _loading = true;
             AutostartSwitch.IsOn = !want;
             _loading = false;
-            _ = ShowErrorAsync("无法设置开机自启动", error ?? "写入启动项失败");
+            _ = ShowErrorAsync(L.T("autostart.errorTitle"),
+                error ?? L.T("autostart.errorDefault"));
         }
     }
 
@@ -321,7 +322,8 @@ public sealed partial class SettingsPage : UserControl
         if (!HotkeySpec.TryFromVirtualKey((int)e.Key, mods, out var spec, out var error) ||
             spec is null)
         {
-            _ = ShowErrorAsync("组合无效", error ?? "请按字母/数字/功能键");
+            _ = ShowErrorAsync(L.T("hotkey.invalidCombo"),
+                error ?? L.T("hotkey.invalidDefault"));
             return;
         }
         ApplyHotkey(spec.ToText(), true);
@@ -353,7 +355,8 @@ public sealed partial class SettingsPage : UserControl
         if (!HotkeySpec.TryParse(text, out var spec, out var error) || spec is null)
         {
             HotkeyBox.Text = _app.HotkeyText;
-            _ = ShowErrorAsync("组合无效", $"{error}(例如 Ctrl+Shift+A)");
+            _ = ShowErrorAsync(L.T("hotkey.invalidCombo"),
+                L.F("hotkey.invalidExample", error));
             return;
         }
         ApplyHotkey(spec.ToText(), true);
@@ -367,8 +370,8 @@ public sealed partial class SettingsPage : UserControl
         HotkeyBox.Text = _app.HotkeyText;
         // 注册失败(被别的程序占用)才提示;成功静默,界面不留状态小字
         var status = _main.HotkeyStatus;
-        if (status.StartsWith("注册失败", StringComparison.Ordinal))
-            _ = ShowErrorAsync("快捷键未生效", status);
+        if (status.StartsWith(L.T("hotkey.regFailPrefix"), StringComparison.Ordinal))
+            _ = ShowErrorAsync(L.T("hotkey.notEffective"), status);
     }
 
     private void BtnClearHotkey_Click(object sender, RoutedEventArgs e)
@@ -475,7 +478,7 @@ public sealed partial class SettingsPage : UserControl
 
     private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
-        UpdateStatusText.Text = "正在检查更新…";
+        UpdateStatusText.Text = L.T("update.checking");
         await _app.Update.CheckAsync(silent: false);
     }
 
@@ -488,7 +491,7 @@ public sealed partial class SettingsPage : UserControl
             {
                 UpdateProgress.Visibility = Visibility.Visible;
                 UpdateProgress.Value = p;
-                UpdateStatusText.Text = $"正在下载并更新… {p}%";
+                UpdateStatusText.Text = L.F("update.downloading", p);
             });
         });
         var error = await _app.Update.DownloadAndApplyAsync(progress);
@@ -559,11 +562,11 @@ public sealed partial class SettingsPage : UserControl
     public static async Task ConfirmDeleteAsync(
         AppServices app, FrameworkElement host, string name)
     {
-        var input = new TextBox { PlaceholderText = $"输入 {name} 以确认" };
+        var input = new TextBox { PlaceholderText = L.F("delete.confirmInput", name) };
         var dialog = new ContentDialog
         {
             XamlRoot = host.XamlRoot,
-            Title = $"删除 {name}",
+            Title = L.F("delete.title", name),
             Content = new StackPanel
             {
                 Spacing = 8,
@@ -571,14 +574,14 @@ public sealed partial class SettingsPage : UserControl
                 {
                     new TextBlock
                     {
-                        Text = "此操作会从配置里移除该 provider 与其 key。",
+                        Text = L.T("delete.body"),
                         TextWrapping = TextWrapping.Wrap,
                     },
                     input,
                 },
             },
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
+            PrimaryButtonText = L.T("api.delete"),
+            CloseButtonText = L.T("form.cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
         var result = await dialog.ShowAsync();
@@ -687,7 +690,7 @@ public sealed partial class SettingsPage : UserControl
 
         if (baseUrl.Length == 0)
         {
-            ShowFormError("Base URL 不能为空");
+            ShowFormError(L.T("form.errEmptyUrl"));
             return;
         }
 
@@ -733,7 +736,7 @@ public sealed partial class SettingsPage : UserControl
         {
             // 写盘失败:把刚加的新条目回滚,别让内存态和磁盘态分叉
             if (_editing is null) ConfigStore.GetList(_app.Cfg, "providers").Remove(entry);
-            ShowFormError($"保存失败:{err}");
+            ShowFormError(L.F("form.errSave", err));
             return;
         }
         ShowListPane();

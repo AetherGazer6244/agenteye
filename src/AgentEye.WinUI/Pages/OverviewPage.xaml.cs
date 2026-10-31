@@ -45,9 +45,9 @@ public sealed partial class OverviewPage : UserControl
     {
         var rows = _app.Results;
         FooterUpdated.Text = _app.Poller.LastRefresh is { } t
-            ? $"上次刷新 {t:HH:mm:ss}"
-            : "尚未刷新";
-        FooterCount.Text = rows.Count == 0 ? "" : $"{rows.Count} 个 provider";
+            ? L.F("ov.lastRefresh", t.ToString("HH:mm:ss"))
+            : L.T("ov.notRefreshed");
+        FooterCount.Text = rows.Count == 0 ? "" : L.F("ov.count", rows.Count);
         EmptyState.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         RowsHost.Children.Clear();
@@ -140,7 +140,7 @@ public sealed partial class OverviewPage : UserControl
         if (row.Paused)
             nameRow.Children.Add(new TextBlock
             {
-                Text = "已暂停",
+                Text = L.T("ov.paused"),
                 FontSize = 11,
                 Foreground = DimBrush(),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -168,13 +168,13 @@ public sealed partial class OverviewPage : UserControl
             VerticalAlignment = VerticalAlignment.Center,
         };
         if (row.Level == Levels.Unconfigured)
-            mainValue.Text = "未配置";
+            mainValue.Text = L.T("ov.unconfigured");
         else if (row.Pct is not null)
             mainValue.Text = $"{Http.F0(row.Pct.Value)}%";
         else if (row.Remaining is not null)
             mainValue.Text = $"{Http.F2(row.Remaining.Value)}{row.Unit}";
         else
-            mainValue.Text = row.Level == Levels.Error ? "错误" : "-";
+            mainValue.Text = row.Level == Levels.Error ? L.T("ov.error") : "-";
         if (row.Error is not null && row.Level != Levels.Unconfigured)
         {
             mainValue.Text = "!";
@@ -205,17 +205,17 @@ public sealed partial class OverviewPage : UserControl
         // 行右键菜单(对齐 Python row_menu:暂停/编辑/删除)
         var menu = new MenuFlyout();
         var miPause = new MenuFlyoutItem
-        { Text = _app.Paused.Contains(row.Name) ? "恢复轮询" : "暂停此 provider" };
+        { Text = _app.Paused.Contains(row.Name) ? L.T("ov.resume") : L.T("ov.pause") };
         miPause.Click += (_, _) => TogglePause(row.Name);
         menu.Items.Add(miPause);
-        var miEdit = new MenuFlyoutItem { Text = "编辑" };
+        var miEdit = new MenuFlyoutItem { Text = L.T("api.edit") };
         miEdit.Click += (_, _) =>
         {
             _main.GoSettings();
             _main.Settings.EditProvider(row.Name);
         };
         menu.Items.Add(miEdit);
-        var miDelete = new MenuFlyoutItem { Text = "删除" };
+        var miDelete = new MenuFlyoutItem { Text = L.T("api.delete") };
         miDelete.Click += async (_, _) => await SettingsPage.ConfirmDeleteAsync(
             _app, this, row.Name);
         menu.Items.Add(miDelete);

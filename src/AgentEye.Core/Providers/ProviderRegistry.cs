@@ -1,5 +1,6 @@
 using AgentEye.Core.Cache;
 using AgentEye.Core.Config;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -71,7 +72,7 @@ public static class ProviderRegistry
     private static ProviderResult Paused(string kind, Dictionary<string, object?> entry)
     {
         var res = BlankResult(kind, entry);
-        res.Detail = "已暂停轮询";
+        res.Detail = L.T("reg.paused");
         res.Paused = true;
         res.Level = Levels.Paused;
         return res;
@@ -80,7 +81,7 @@ public static class ProviderRegistry
     private static ProviderResult Cancelled(string kind, Dictionary<string, object?> entry)
     {
         var res = BlankResult(kind, entry);
-        res.Detail = "已退出,本轮未拉取";
+        res.Detail = L.T("reg.skippedRound");
         res.Level = Levels.Paused;
         return res;
     }
@@ -97,7 +98,7 @@ public static class ProviderRegistry
             return key;
         var resolved = ConfigStore.PlainKey(entry);
         if (resolved.Length == 0)
-            throw new KeyDecryptError("key_enc 解密失败,请在设置里重新填写 key");
+            throw new KeyDecryptError(L.T("reg.keyDecrypt"));
         return resolved;
     }
 
@@ -153,14 +154,14 @@ public static class ProviderRegistry
         if (PlaceholderKeys.Contains(key)) key = "";
         if (key.Length == 0 && !loginCreds)
         {
-            result.Error = "未配置 key";
+            result.Error = L.T("reg.noKey");
             result.Unconfigured = true;
             result.Level = Levels.Unconfigured;
             return result;
         }
         if (!Adapters.TryGetValue(kind, out var adapter))
         {
-            result.Error = $"未知 provider kind: {kind}";
+            result.Error = L.F("reg.unknownKind", kind);
             result.Level = Levels.Error;
             return result;
         }
@@ -242,7 +243,7 @@ public static class ProviderRegistry
         {
             var name = e.Entry.TryGetValue("name", out var n) && n is string ns ? ns : "";
             return byName.TryGetValue(name, out var r) ? r : Failed(e.Kind, e.Entry,
-                new InvalidOperationException("拉取任务未返回结果"));
+                new InvalidOperationException(L.T("reg.noResult")));
         }).ToList();
     }
 

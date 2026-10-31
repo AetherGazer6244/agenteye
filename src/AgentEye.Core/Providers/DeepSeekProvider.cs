@@ -1,3 +1,5 @@
+using AgentEye.Core.Localization;
+
 namespace AgentEye.Core.Providers;
 
 /// <summary>DeepSeek 官方余额(端口自 deepseek.py)。</summary>
@@ -16,7 +18,7 @@ public static class DeepSeekProvider
         if (bas.EndsWith("/v1")) bas = bas[..^3];
         var key = e.ApiKey ?? "";
         if (key.Length == 0)
-            return FetchPayload.Err("未配置 api_key", unconfigured: true);
+            return FetchPayload.Err(L.T("pr.noKey"), unconfigured: true);
 
         var (ok, status, body) = await Http.GetJsonAsync(bas + "/user/balance",
             new Dictionary<string, string>
@@ -24,14 +26,14 @@ public static class DeepSeekProvider
                 ["Authorization"] = $"Bearer {key}",
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return FetchPayload.Err("网络错误: 网络异常");
-        if (status is 401 or 403) return FetchPayload.Err($"key 无效 (HTTP {status})");
+        if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
+        if (status is 401 or 403) return FetchPayload.Err(L.F("pr.keyInvalid", status));
         if (status != 200) return FetchPayload.Err($"HTTP {status}");
-        if (!Http.IsObj(body)) return FetchPayload.Err("响应非 JSON");
+        if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));
 
         var infos = Http.Arr(body, "balance_infos");
-        if (infos is not { Count: > 0 }) return FetchPayload.Err("响应无 balance_infos");
-        if (!Http.IsObj(infos[0])) return FetchPayload.Err("响应无 balance_infos");
+        if (infos is not { Count: > 0 }) return FetchPayload.Err(L.T("ds.noBalanceInfos"));
+        if (!Http.IsObj(infos[0])) return FetchPayload.Err(L.T("ds.noBalanceInfos"));
         var info = infos[0];
         var currency = Http.Str(info, "currency") ?? "CNY";
         var sym = Symbols.GetValueOrDefault(currency, currency + " ");
@@ -48,8 +50,8 @@ public static class DeepSeekProvider
             System.Text.Json.JsonValueKind.String => (av.GetString()?.Length ?? 0) > 0,
             _ => true,
         };
-        var detail = $"赠金 {sym}{Http.F2(granted)} · 充值 {sym}{Http.F2(topped)}";
-        if (!available) detail += " · 余额不可用";
+        var detail = L.F("pr.detailGranted", sym, Http.F2(granted), sym, Http.F2(topped));
+        if (!available) detail += L.T("ds.noBalance");
 
         return new FetchPayload
         {

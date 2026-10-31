@@ -1,4 +1,5 @@
 using AgentEye.Core.Cache;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 
 namespace AgentEye.WinUI.Services;
@@ -64,10 +65,10 @@ public sealed class NotifyService
     public async Task ShowAlertAsync(IReadOnlyList<ProviderResult> rows, CancellationToken ct)
     {
         var title = rows.Count == 1
-            ? $"{rows[0].Name} 额度告警"
-            : $"{rows.Count} 个 provider 额度告警";
+            ? L.F("notify.titleOne", rows[0].Name)
+            : L.F("notify.titleMany", rows.Count);
         var body = string.Join("\n", rows.Select(r =>
-            $"{r.Name}: {(r.Pct is null ? r.Detail : $"剩 {Http.F0(r.Pct.Value)}% · {r.Detail}")}"));
+            $"{r.Name}: {(r.Pct is null ? r.Detail : L.F("notify.body", Http.F0(r.Pct.Value), r.Detail))}"));
         await ShowAsync(title, body);
         await Task.CompletedTask;
     }

@@ -171,7 +171,7 @@ public sealed partial class MainWindow : Window
             _hotkey = new HotkeyService(TogglePanel);
             ApplyHotkey();
         }
-        catch { _hotkey = null; _hotkeyStatus = "热键服务不可用"; }
+        catch { _hotkey = null; _hotkeyStatus = L.T("hotkey.svcDown"); }
 
         // 主题跟随系统:auto 时系统切换会触发这里,同步按钮配色即可,
         // 页面/小组件各自监听 ActualThemeChanged 重渲染
@@ -242,7 +242,7 @@ public sealed partial class MainWindow : Window
         _settings.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
         _settings.OnShown();
         BtnBack.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
-        AppTitle.Text = tag == "overview" ? "AgentEye" : "AgentEye — 设置";
+        AppTitle.Text = tag == "overview" ? "AgentEye" : L.T("win.titleSettings");
     }
 
     // ---------------- 头部图标按钮 ----------------
@@ -292,13 +292,13 @@ public sealed partial class MainWindow : Window
         {
             if (_hotkey is null)
             {
-                _hotkeyStatus = "热键服务不可用";
+                _hotkeyStatus = L.T("hotkey.svcDown");
                 return;
             }
             _hotkey.Apply(_app.HotkeyText, _app.HotkeyUsable);
             _hotkeyStatus = _hotkey.Status;
         }
-        catch { _hotkeyStatus = "热键设置失败"; }
+        catch { _hotkeyStatus = L.T("hotkey.applyFailed"); }
     }
 
     /// <summary>
