@@ -3,7 +3,7 @@
 Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 紧凑面板 +
 托盘常驻 + 桌面小组件,盯着各平台 API 额度,快烧完时提前告警。
 
-![version](https://img.shields.io/badge/version-v1.2.3-blue)
+![version](https://img.shields.io/badge/version-v1.3.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B%20%2F%2011-blueviolet)
 ![runtime](https://img.shields.io/badge/runtime-.NET%208%20%2B%20WinAppSDK%201.7-5C2D91)
 

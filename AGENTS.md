@@ -121,6 +121,29 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 - 上面的「图标字形用 Segoe Fluent Icons」只约束**界面内按钮**,
   不含 app 级 .ico 资源。
 
+## 本地化契约(1.3.0 起)
+
+- 唯一文案源是 `Core/Localization/L.cs`:zh / en 两本内置字典,
+  `L.T(key)` 直取、`L.F(key, args..)` 格式化;**新增界面文案必须
+  zh / en 双键同时给**,漏一边会被
+  `LocalizationTests.Zh_And_En_Dictionaries_Stay_In_Sync` 拦下。
+- 语言在启动时定型:App ctor 读 config `ui.language`(默认
+  "zh-Hans")→ `L.Init()` 一次,**运行期不变,切换重启生效**;
+  设置页「语言」行只负责保存 + 弹窗问是否立即重启。
+- **不许走 resw/x:Uid/PrimaryLanguageOverride**:解包形态下
+  `PrimaryLanguageOverride` 抛 `InvalidOperationException`(实测,
+  连 App ctor 里都抛),resw 方案已证伪并删除;XAML 静态文本用
+  `x:Name` + 代码 `L.T` 回填(如 SettingsPage.ApplyStrings)。
+- 静态数组/字典初始化器里**不许放文案**(类型初始化可能早于
+  `L.Init`),存键名、用时 `L.T` 解析(Detect/OpenCodeGo/Zhipu
+  都是这么改的)。
+- 范围:只翻"流向 UI"的文案;纯日志与内部异常保持中文。
+  `PlaceholderKeys`(provider 占位 key 文本)是 config 兼容标记,
+  不是 UI 文案,**不许本地化**。
+- 测试默认 zh:`L.Lang` 是进程级静态态,en 用例必须 try/finally
+  还原 `L.Init("zh-Hans")`,否则污染同进程其它用例(现有 130 条
+  断言全按 zh 文案写)。
+
 ## 中文文件
 
 含中文的文件一律用编辑器工具(Read/Write/Edit)读写;PowerShell 5.1 的
