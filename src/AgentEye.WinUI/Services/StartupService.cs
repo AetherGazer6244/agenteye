@@ -117,4 +117,24 @@ public static class StartupService
             return false;
         }
     }
+
+    /// <summary>
+    /// 自愈:已登记但命令行指向的不是当前 exe(挪目录/换盘/重装到新路径)时
+    /// 静默重写,避免"开关显示开着、开机却拉不起"的假自启。失败不管(增强面)。
+    /// </summary>
+    public static void EnsureCurrent()
+    {
+        try
+        {
+            if (!IsEnabled()) return;
+            var registered = CurrentCommand();
+            if (string.Equals(registered, CommandLine(), StringComparison.OrdinalIgnoreCase))
+                return;
+            SetEnabled(true, out _);
+        }
+        catch
+        {
+            // 增强面:自愈失败不影响主流程
+        }
+    }
 }

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """AgentEye 应用图标生成器(dev-only)。
 
-设计:几何体字母 A(托盘蓝 #285A96)+ 三角形留白里的瞳孔圆点。
+设计:几何风字母 A——圆头粗笔画的 Λ(峰顶/脚端全圆角)+ 胶囊形横杠,
+两腿负空间里一颗瞳孔圆点。只用两个色:笔画托盘蓝 #285A96、瞳孔亮蓝
+#8FC4F2(与 TrayIconRenderer 的 SrcBody/SrcPupil 染色契约同源)。
 坐标在 1024×1024 逻辑画布上定义,绘制时 4× 超采样再 LANCZOS 缩放,
-所以边缘平滑且不依赖任何字体。
+边缘平滑且不依赖任何字体。
 
 用法:
   python tools/make_icon.py --preview            # 出多尺寸预览拼版 PNG
-  python tools/make_icon.py --variant v1         # 生成正式 .ico
-  python tools/make_icon.py --variant v1 --out path.ico
+  python tools/make_icon.py --variant final      # 生成正式 .ico
+  python tools/make_icon.py --variant final --out path.ico
 """
 
 import argparse
@@ -20,39 +22,38 @@ SS = 4                      # 超采样倍数
 LOGICAL = 1024              # 逻辑画布边长
 ICO_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 
-# 字母 A 的骨架(逻辑画布 1024):
-#   顶点 (512, apex_y),基线 y = base_y,基线左右端点 base_l / base_r
-# 定稿 = 窄高 A(腿薄、字面瘦)+ 横杠上方内切圆瞳孔(亮蓝,略下移),
-# 16px 时瞳孔仍有 1~2px,任务栏/标题栏能认出"眼"。
+# 几何 A 的骨架(逻辑画布 1024):
+#   Λ = 顶点 apex 到两脚 foot_l / foot_r 的粗笔画(圆头,峰顶圆角),
+#   横杠 = 两腿之间的胶囊形(两端落在腿中线上,与腿融为一体),
+#   瞳孔 = 两腿负空间、横杠上方的一颗圆点。
+# 定稿 = 窄高 Λ + 亮蓝瞳孔;≤24px 用 small 变体(笔画更粗,字面不糊)。
 VARIANTS = {
     "final": dict(
-        name="AgentEye 窄高 A + 亮蓝瞳孔",
-        apex_y=95.0,
-        base_y=925.0,
-        base_l=205.0,
-        base_r=819.0,
-        leg=104.0,           # 腿部水平厚度
-        bar_top=622.0,       # 横杠上沿
-        bar_bottom=756.0,    # 横杠下沿
-        pupil_ratio=1.0,     # 瞳孔占内切圆比例
-        pupil_dy=40.0,       # 瞳孔下移(视觉居中)
-        body="#285A96",      # 托盘蓝
-        pupil="#8FC4F2",
+        name="AgentEye 几何 A(圆头笔画 + 瞳孔)",
+        apex=(512.0, 118.0),
+        foot_l=(152.0, 902.0),
+        foot_r=(872.0, 902.0),
+        stroke=150.0,        # 笔画厚度
+        bar_y0=652.0,        # 横杠上沿
+        bar_y1=782.0,        # 横杠下沿(胶囊高 130)
+        pupil=(512.0, 478.0),
+        pupil_r=62.0,
+        body="#285A96",      # 托盘蓝(TrayIconRenderer.SrcBody 同源)
+        pupil_color="#8FC4F2",
     ),
-    # 小尺寸专用:腿更粗、横杠更靠下,≤24px 时字面不至于糊成一团
+    # 小尺寸专用:笔画更粗、横杠更靠下,≤24px 时字面不至于糊成一团
     "small": dict(
-        name="AgentEye 窄高 A + 亮蓝瞳孔(小尺寸版)",
-        apex_y=95.0,
-        base_y=925.0,
-        base_l=185.0,
-        base_r=839.0,
-        leg=126.0,
-        bar_top=632.0,
-        bar_bottom=762.0,
-        pupil_ratio=1.0,
-        pupil_dy=30.0,
+        name="AgentEye 几何 A(小尺寸版)",
+        apex=(512.0, 110.0),
+        foot_l=(138.0, 910.0),
+        foot_r=(886.0, 910.0),
+        stroke=182.0,
+        bar_y0=672.0,
+        bar_y1=798.0,
+        pupil=(512.0, 482.0),
+        pupil_r=76.0,
         body="#285A96",
-        pupil="#8FC4F2",
+        pupil_color="#8FC4F2",
     ),
 }
 
@@ -65,82 +66,43 @@ def rgb(h):
     return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255)
 
 
-def triangles(v):
-    """返回 (外三角形, 内三角形) 的点集;内三角形与外三角形边平行(同底相似形)。"""
-    apex = (512.0, v["apex_y"])
-    base_l, base_r, base_y = v["base_l"], v["base_r"], v["base_y"]
-    half = (base_r - 512.0)
-    s = 1.0 - v["leg"] / half
-    cy = (apex[1] + base_y + base_y) / 3.0
-    inner_apex = (512.0, cy + s * (apex[1] - cy))
-    inner_l = (512.0 + s * (base_l - 512.0), base_y)
-    inner_r = (512.0 + s * (base_r - 512.0), base_y)
-    outer = [apex, (base_l, base_y), (base_r, base_y)]
-    inner = [inner_apex, inner_l, inner_r]
-    return outer, inner
-
-
-def edge_x(y, inner, side):
-    """内三角形左右边在高度 y 处的 x。"""
-    (ax, ay), (lx, ly), (rx, ry) = inner
-    if side == "l":
-        t = (ly - y) / (ly - ay)
-        return lx + (ax - lx) * t
-    t = (ry - y) / (ry - ay)
-    return rx + (ax - rx) * t
-
-
-def incenter(tri):
-    """三角形内心(等边权重)与内切半径。"""
-    (ax, ay), (bx, by), (cx, cy) = tri
-    a = ((bx - cx) ** 2 + (by - cy) ** 2) ** 0.5
-    b = ((cx - ax) ** 2 + (cy - ay) ** 2) ** 0.5
-    c = ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
-    p = a + b + c
-    x = (a * ax + b * bx + c * cx) / p
-    y = (a * ay + b * by + c * cy) / p
-    return (x, y), _dist_to_base(x, y, (bx, by), (cx, cy))
-
-
-def _dist_to_base(x, y, b, c):
-    (bx, by), (cx, cy) = b, c
-    dx, dy = cx - bx, cy - by
-    if dx == 0 and dy == 0:
-        return 0.0
-    return abs(dy * x - dx * y + cx * by - cy * bx) / (dx * dx + dy * dy) ** 0.5
+def leg_center_x(v, y):
+    """腿中线在高度 y 处的 x(左右各一个)。"""
+    (ax, ay) = v["apex"]
+    (lx, ly), (rx, ry) = v["foot_l"], v["foot_r"]
+    t = (y - ay) / (ly - ay)
+    return ax + (lx - ax) * t, ax + (rx - ax) * t
 
 
 def build(v, size=LOGICAL, canvas=LOGICAL * SS):
-    """按超采样画布绘制,返回 (大图, 缩到 size 的图)。"""
-    outer, inner = triangles(v)
+    """按超采样画布绘制几何 A,返回 (大图, 缩到 size 的图)。"""
+    k = canvas / LOGICAL
     img = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-
-    def sc(pts):
-        k = canvas / LOGICAL
-        return [(x * k, y * k) for (x, y) in pts]
-
     body = rgb(v["body"])
-    d.polygon(sc(outer), fill=body)                 # 整块实心
-    d.polygon(sc(inner), fill=(0, 0, 0, 0))          # 挖出内三角(A 的中空)
 
-    bt, bb = v["bar_top"], v["bar_bottom"]
-    bar = [
-        (edge_x(bt, inner, "l"), bt),
-        (edge_x(bt, inner, "r"), bt),
-        (edge_x(bb, inner, "r"), bb),
-        (edge_x(bb, inner, "l"), bb),
-    ]
-    d.polygon(sc(bar), fill=body)                    # 横杠
+    # Λ 两腿:粗笔画 + 端点圆(峰顶共用一个圆 → 圆角峰,脚端圆头)
+    lw = int(round(v["stroke"] * k))
+    apex = (v["apex"][0] * k, v["apex"][1] * k)
+    foot_l = (v["foot_l"][0] * k, v["foot_l"][1] * k)
+    foot_r = (v["foot_r"][0] * k, v["foot_r"][1] * k)
+    d.line([apex, foot_l], fill=body, width=lw)
+    d.line([apex, foot_r], fill=body, width=lw)
+    r_cap = lw / 2.0
+    for (cx, cy) in (v["apex"], v["foot_l"], v["foot_r"]):
+        d.ellipse([(cx * k - r_cap, cy * k - r_cap),
+                   (cx * k + r_cap, cy * k + r_cap)], fill=body)
 
-    # 瞳孔:横杠上方三角形的内切圆
-    tri = [inner[0], (edge_x(bt, inner, "l"), bt), (edge_x(bt, inner, "r"), bt)]
-    (cx, cy), r = incenter(tri)
-    r *= v["pupil_ratio"]
-    cy += v.get("pupil_dy", 0.0)
-    k = canvas / LOGICAL
-    d.ellipse([(cx - r) * k, (cy - r) * k, (cx + r) * k, (cy + r) * k],
-              fill=rgb(v["pupil"]))
+    # 横杠:胶囊形,两端落在腿中线上(与腿融为一体,构成 A 的字面)
+    y0, y1 = v["bar_y0"], v["bar_y1"]
+    lx, rx = leg_center_x(v, (y0 + y1) / 2.0)
+    d.rounded_rectangle([lx * k, y0 * k, rx * k, y1 * k],
+                        radius=(y1 - y0) / 2.0 * k, fill=body)
+
+    # 瞳孔:两腿负空间、横杠上方的圆点("眼")
+    (pcx, pcy), pr = v["pupil"], v["pupil_r"]
+    d.ellipse([(pcx - pr) * k, (pcy - pr) * k, (pcx + pr) * k, (pcy + pr) * k],
+              fill=rgb(v["pupil_color"]))
 
     return img, img.resize((size, size), Image.LANCZOS)
 

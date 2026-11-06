@@ -22,7 +22,11 @@ public sealed class TrayIconService : IDisposable
     private const int NIN_CONTEXTMENU = 0x0400 + 5;
     private const uint WM_CONTEXTMENU = 0x007B;  // version 4 的右键事件
 
-    [StructLayout(LayoutKind.Sequential, Pack = 2, CharSet = CharSet.Unicode)]
+    // ⚠ 不许 Pack=2:x64 下 8 字节的 hWnd/hIcon 会被压到 4 字节对齐(hWnd@4),
+    // 与原生 NOTIFYICONDATAW(x64 hWnd@8 / hIcon@32)错位 → NIM_ADD 必然失败,
+    // 且失败被增强面吞掉 → 托盘永远无图标、无任何报错(实测踩坑,Default pack
+    // 实测 Size=952 / hWnd@8 / hIcon@32,与原生 x64 布局逐字段吻合)。
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NOTIFYICONDATAW
     {
         public int cbSize;
@@ -237,7 +241,7 @@ public sealed class TrayIconService : IDisposable
             case 1: try { _main.RestoreFromTray(); } catch { } break;
             case 2: try { _main.ToggleWidget(); } catch { } break;
             case 3: try { _main.RestoreFromTray(); _main.GoSettings(); } catch { } break;
-            case 4: try { _main.Close(); } catch { } break;
+            case 4: try { _main.ExitFromTray(); } catch { } break;
         }
     }
 

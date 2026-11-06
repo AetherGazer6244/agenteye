@@ -100,9 +100,9 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 
 ## 图标资源契约
 
-- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(A 标 + 瞳孔,
-  托盘蓝 #285A96),16/20/24/32/40/48/64/128/256 九档、**32bpp BMP
-  条目**(不能改成 PNG 压缩条目——Inno 的 `SetupIconFile` 吃不下)。
+- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(几何风 A:
+  圆头笔画 Λ + 胶囊横杠 + 瞳孔点,托盘蓝 #285A96),16/20/24/32/40/48/64/128/256
+  九档、**32bpp BMP 条目**(不能改成 PNG 压缩条目——Inno 的 `SetupIconFile` 吃不下)。
   由 `tools\make_icon.py` 生成(Pillow,dev-only,不在构建流程里);
   要改样式先改脚本再重生成,别手改 .ico。
 - 同一份文件三处用:csproj `ApplicationIcon` 内嵌进 exe(资源管理器/
@@ -118,6 +118,11 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 - **GDI COLORREF 必须是 `0x00BBGGRR`**:高字节非 0 时 GDI 直接拒画,
   一个像素都不落——旧托盘代码就是栽在这(`0xFF000000 | ...`),
   托盘图标一直是空的,别再写错。
+- **Shell 结构体不许随手 `Pack=2`**:`NOTIFYICONDATAW` 带 `Pack=2` 时
+  x64 的 8 字节 hWnd/hIcon 被压到 4 字节对齐(hWnd@4,原生在 @8),
+  `NIM_ADD` 必然失败且被增强面吞掉 → 托盘永远无图标、无报错
+  (1.4.1 实测踩坑);用 Default pack(实测 Size=952 / hWnd@8 /
+  hIcon@32,与原生 x64 布局逐字段吻合)。
 - 上面的「图标字形用 Segoe Fluent Icons」只约束**界面内按钮**,
   不含 app 级 .ico 资源。
 
@@ -169,6 +174,9 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   `schema_version` 仍是 2,Python 版 merge 会保留未知键,不受影响。
 - 开机自启:`ui.autostart` 只是镜像值,**真实状态以注册表为准**;
   `ui.language`(默认 "zh-Hans")1.2.1 只落库不切换,中英双语 1.3.0 起生效。
+- 关窗行为:`ui.close_to_tray`(缺省 true = X 隐藏进托盘,false = X 直接
+  退出);启动时 `StartupService.EnsureCurrent()` 自愈注册表旧路径,
+  镜像值以注册表为准回填。
 
 ## 设置页版式契约(卡片行模板)
 
@@ -211,8 +219,12 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   提示并回滚,不写坏值。
 - 唤醒语义:托盘左键 / 小组件点击 = 总是拉回前台(`MainWindow.WakeUp()`);
   **热键 = 唤醒/隐藏切换**(`MainWindow.TogglePanel()`):面板在前台就
-  `AppWindow.Hide()` 藏回托盘,否则拉回前台。隐藏 ≠ 退出(托盘/轮询继续),
-  关主窗 X 仍是退出。热键不给前台权,`SetForegroundWindow` 被拒时借前台线程
+  `AppWindow.Hide()` 藏回托盘,否则拉回前台。隐藏 ≠ 退出(托盘/轮询继续);
+  **关主窗 X 由 `ui.close_to_tray` 决定**(1.4.1 起,缺省 true = 拦截
+  `AppWindow.Closing` 隐藏进托盘;false = 旧行为直接退出)。真退出只有
+  三条路:托盘菜单「退出」(`ExitFromTray`)、更新安装(安装器先置位
+  `MainWindow.CloseAllowedByUpdate` 放行 Restart Manager)、开关关掉后的 X。
+  热键不给前台权,`SetForegroundWindow` 被拒时借前台线程
   (`AttachThreadInput`)再试。
 
 ## 增强面降级

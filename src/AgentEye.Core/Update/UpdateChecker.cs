@@ -54,7 +54,7 @@ public sealed record UpdateCheckResult(
 public static class UpdateChecker
 {
     /// <summary>更新源仓库(公开仓库,匿名 API 即可)。</summary>
-    public const string Owner = "Cecilian-Elysian";
+    public const string Owner = "AetherGazer6244";
     public const string Repo = "AgentEye";
 
     /// <summary>安装包资产名匹配模式:AgentEye_Setup.exe(Inno Setup 安装器)。</summary>

@@ -87,6 +87,13 @@ public sealed partial class MainWindow : Window
     private HotkeyService? _hotkey;
     private string _hotkeyStatus = "";
     private bool _closed;
+    private bool _forceClose;    // 托盘"退出"/更新重启置位:绕过关窗进托盘拦截
+
+    /// <summary>
+    /// 更新流程放行:安装器拉起后 Restart Manager 要关闭本应用,
+    /// 关窗拦截必须让路,否则静默升级被卡死(安装器契约 CloseApplications=yes)。
+    /// </summary>
+    internal static volatile bool CloseAllowedByUpdate;
 
     public MainWindow()
     {
@@ -111,6 +118,10 @@ public sealed partial class MainWindow : Window
         RestoreGeometry();
 
         Closed += (_, _) => OnClosed();
+        // 关主窗 X:ui.close_to_tray(默认开)→ 隐藏进托盘,进程/托盘/轮询都还在;
+        // 关闭开关(或托盘"退出"/更新安装)才真退出
+        try { AppWindow.Closing += OnAppWindowClosing; }
+        catch { /* 老系统 AppWindow.Closing 不可用:退回旧行为(关闭即退出) */ }
     }
 
     /// <summary>把 A 标图标挂到窗口上;失败静默(增强面)。</summary>
@@ -164,6 +175,20 @@ public sealed partial class MainWindow : Window
                 ShowWidget();
         }
         catch { /* 增强面,失败静默 */ }
+
+        // 开机自启自愈 + 镜像同步:注册表指向的 exe 路径与当前不一致(挪目录/换盘)
+        // 时重写;镜像值以注册表为准回填,修掉历史遗留的分叉。失败静默(增强面)。
+        try
+        {
+            StartupService.EnsureCurrent();
+            var regOn = StartupService.IsEnabled();
+            if (_app.Autostart != regOn)
+            {
+                _app.SetAutostart(regOn);
+                _app.TrySaveCfg();
+            }
+        }
+        catch { /* 增强面 */ }
 
         // 全局快捷键(唤醒/隐藏主面板);失败静默降级(不把主流程带崩)
         try
@@ -348,6 +373,46 @@ public sealed partial class MainWindow : Window
         catch { /* 增强面 */ }
     }
 
+    /// <summary>
+    /// 关主窗 X 的拦截:close_to_tray 开(默认)时取消关闭、藏进托盘。
+    /// 真退出的三条路不受影响:托盘菜单"退出"、更新安装(Restart Manager)、
+    /// 关闭开关关掉后的旧行为。
+    /// </summary>
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_forceClose || _closed || CloseAllowedByUpdate) return; // 真:退出
+        if (!_app.CloseToTray) return;                              // 用户选了直接退出
+        try
+        {
+            args.Cancel = true;
+            SaveGeometry();   // 平时不再有"关窗"时机,隐藏前顺手把几何落盘
+            HidePanel();
+        }
+        catch { /* 增强面:隐藏失败就退回系统默认(窗口关闭退出) */ }
+    }
+
+    /// <summary>几何持久化(AppWindow 物理像素直接存,恢复时同源)。</summary>
+    private void SaveGeometry()
+    {
+        try
+        {
+            var ui = _app.UiDict();
+            ui["x"] = (double)AppWindow.Position.X;
+            ui["y"] = (double)AppWindow.Position.Y;
+            ui["width"] = (double)AppWindow.Size.Width;
+            ui["height"] = (double)AppWindow.Size.Height;
+            _app.TrySaveCfg();
+        }
+        catch { /* 关窗路径绝不因写盘失败崩溃 */ }
+    }
+
+    /// <summary>真退出(托盘菜单"退出"/更新重启):绕过关窗进托盘拦截,走完整清理。</summary>
+    public void ExitFromTray()
+    {
+        _forceClose = true;
+        Close();
+    }
+
     /// <summary>高级设置:立即改主窗口尺寸并落盘(物理像素)。</summary>
     public void ApplyWindowSize(int width, int height)
     {
@@ -447,16 +512,7 @@ public sealed partial class MainWindow : Window
         }
         catch { /* 静默 */ }
         // 几何持久化(AppWindow 物理像素直接存,恢复时同源)
-        try
-        {
-            var ui = _app.UiDict();
-            ui["x"] = (double)AppWindow.Position.X;
-            ui["y"] = (double)AppWindow.Position.Y;
-            ui["width"] = (double)AppWindow.Size.Width;
-            ui["height"] = (double)AppWindow.Size.Height;
-            _app.TrySaveCfg();
-        }
-        catch { /* 关窗路径绝不因写盘失败崩溃 */ }
+        SaveGeometry();
         _widget?.Dispose();
         _tray?.Dispose();
         _hotkey?.Dispose();

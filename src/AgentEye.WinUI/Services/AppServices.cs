@@ -146,6 +146,22 @@ public sealed class AppServices
 
     public void SetAutostart(bool enabled) => UiDict()["autostart"] = enabled;
 
+    /// <summary>
+    /// 关主窗行为(ui.close_to_tray):true = 点 X 隐藏进托盘(默认,进程/托盘存活),
+    /// false = 点 X 直接退出(1.3 及以前的行为)。托盘菜单"退出"与更新安装不受影响。
+    /// </summary>
+    public bool CloseToTray
+    {
+        get
+        {
+            var ui = UiDict();
+            if (ui.TryGetValue("close_to_tray", out var c) && c is bool b) return b;
+            return true;
+        }
+    }
+
+    public void SetCloseToTray(bool enabled) => UiDict()["close_to_tray"] = enabled;
+
     /// <summary>界面语言(ui.language);1.3.0 起支持中英切换。</summary>
     public string Language
     {

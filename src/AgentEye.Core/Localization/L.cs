@@ -47,6 +47,12 @@ public static class L
         ["autostart.on"] = "已启用",
         ["autostart.off"] = "已关闭",
 
+        // —— 设置页:关窗行为 ——
+        ["close.tray.title"] = "关闭主面板时",
+        ["close.tray.subtitle"] = "点关闭按钮隐藏到托盘,后台继续运行;可用托盘或快捷键唤回",
+        ["close.tray.on"] = "隐藏到托盘",
+        ["close.tray.off"] = "直接退出",
+
         // —— 设置页:语言 ——
         ["lang.title"] = "语言",
         ["lang.subtitle"] = "界面语言(切换后重启生效)",
@@ -360,6 +366,12 @@ public static class L
         ["autostart.subtitle"] = "Start automatically in the background at login (silent, tray only)",
         ["autostart.on"] = "On",
         ["autostart.off"] = "Off",
+
+        // —— Settings: close behavior ——
+        ["close.tray.title"] = "When the panel is closed",
+        ["close.tray.subtitle"] = "Closing hides the panel to the tray and keeps polling in the background; restore it from the tray or the hotkey",
+        ["close.tray.on"] = "Hide to tray",
+        ["close.tray.off"] = "Exit",
 
         // —— Settings: language ——
         ["lang.title"] = "Language",

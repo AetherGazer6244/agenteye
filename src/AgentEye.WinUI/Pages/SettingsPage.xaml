@@ -53,6 +53,27 @@
                 </Grid>
             </Border>
 
+            <!-- 关窗行为:X = 隐藏进托盘(默认)/ 直接退出 -->
+            <Border Style="{StaticResource AeSettingsItemStyle}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
+                              Glyph="&#xE921;" />
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtCloseTrayTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtCloseTraySub"
+                                   Style="{StaticResource AeSettingsItemSubtitleStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="CloseTraySwitch" Grid.Column="2"
+                                  MinWidth="0" VerticalAlignment="Center"
+                                  Toggled="CloseTraySwitch_Toggled" />
+                </Grid>
+            </Border>
+
             <!-- 语言 -->
             <Border Style="{StaticResource AeSettingsItemStyle}">
                 <Grid ColumnSpacing="12">
@@ -215,7 +236,8 @@
                                      LostFocus="FKey_LostFocus" />
                             <TextBlock Text="Model" Grid.Row="3" VerticalAlignment="Center" />
                             <ComboBox x:Name="FModel" Grid.Row="3" Grid.Column="1"
-                                      IsEditable="True" />
+                                      IsEditable="True"
+                                      SelectionChanged="FModel_SelectionChanged" />
                         </Grid>
                         <TextBlock x:Name="FormDetect" Foreground="{StaticResource AeTextSecondaryBrush}"
                                    Visibility="Collapsed" TextWrapping="Wrap" />

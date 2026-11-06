@@ -3,7 +3,7 @@
 应用的"检查更新"走 GitHub Releases。本文件规定发布时必须满足的格式,
 否则应用会提示"release 里没有 setup.exe 安装包"或拒绝安装。
 
-- 仓库:`github.com/Cecilian-Elysian/AgentEye`(公开,应用用匿名 API 读取)
+- 仓库:`github.com/AetherGazer6244/AgentEye`(公开,应用用匿名 API 读取)
 - 应用侧实现:`src/AgentEye.Core/Update/`(检查/下载/校验)与
   `src/AgentEye.WinUI/Services/UpdateService.cs`(编排/拉起安装器)
 - 一键构建:`build.ps1`(项目根)→ `dist\`(便携目录)+ `installer\AgentEye_Setup.exe`

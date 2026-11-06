@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-11-06 — 1.4.1:托盘图标修复 + 关窗进托盘 + 几何风图标
+
+### 修复
+
+- **托盘图标**(长期"托盘没有图标"的根因):`NOTIFYICONDATAW` 误用
+  `Pack=2`,x64 下 8 字节 hWnd/hIcon 被压到 4 字节对齐(hWnd@4,原生
+  布局在 @8),`NIM_ADD` 必然失败且被增强面静默吞掉。改回 Default
+  pack(实测 Size=952 / hWnd@8 / hIcon@32,与原生 x64 布局逐字段吻合)
+- **主题被滚轮切回去**:ComboBox 选中后保持焦点,滚轮会改它的
+  SelectedIndex(设置页整页在 ScrollViewer 里,滚轮本意是滚页面)。
+  主题/语言/类型/模型下拉提交选择后把焦点交还页面,滚轮恢复滚动;
+  模型列表程序填充不再触发移焦点
+- **开机自启自愈**:启动时注册表命令行与当前 exe 不一致(挪目录/
+  换盘/重装)即静默重写;`ui.autostart` 镜像值以注册表为准回填
+
+### 新增
+
+- **关窗行为可配**:设置页「关闭主面板时」开关(`ui.close_to_tray`,
+  缺省开 = 点 X 隐藏进托盘,进程/托盘/轮询继续;关 = 直接退出)。
+  真退出走托盘菜单「退出」;更新安装经 `MainWindow.CloseAllowedByUpdate`
+  放行 Restart Manager;语言切换重启改走 `ExitFromTray`(托盘不残留)
+- **几何风应用图标**:圆头笔画 Λ + 胶囊横杠 + 瞳孔圆点
+  (`tools/make_icon.py` 重写设计段,双色与托盘染色契约同源)
+
 ## 2026-10-31 — 1.4.0:API Key 接入优化
 
 ### 新增
@@ -217,7 +241,7 @@
 
 ### 新增
 
-- 自动更新通道:更新源为 GitHub Releases(`Cecilian-Elysian/AgentEye`)。
+- 自动更新通道:更新源为 GitHub Releases(`AetherGazer6244/AgentEye`)。
   - 启动时静默检查一次(同一自然日只查一次,状态存 `cache/update_state.json`)
   - 设置页「关于」区:当前版本 / 检查更新 / 下载并更新 / 忽略此版本
   - 下载 → sha256 校验(GitHub 资产 `digest`)→ 解包 → 退出应用 →

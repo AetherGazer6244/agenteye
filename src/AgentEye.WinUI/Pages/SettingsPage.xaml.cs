@@ -32,7 +32,7 @@ public sealed partial class SettingsPage : UserControl
     private const int VkShift = 0x10, VkControl = 0x11, VkMenu = 0x12,
                       VkLWin = 0x5B, VkRWin = 0x5C;
 
-    private const string RepoUrl = "https://github.com/Cecilian-Elysian/AgentEye";
+    private const string RepoUrl = "https://github.com/AetherGazer6244/AgentEye";
 
     [DllImport("user32.dll")]
     private static extern short GetKeyState(int nVirtKey);
@@ -82,6 +82,10 @@ public sealed partial class SettingsPage : UserControl
         TxtAutostartSub.Text = L.T("autostart.subtitle");
         AutostartSwitch.OnContent = L.T("autostart.on");
         AutostartSwitch.OffContent = L.T("autostart.off");
+        TxtCloseTrayTitle.Text = L.T("close.tray.title");
+        TxtCloseTraySub.Text = L.T("close.tray.subtitle");
+        CloseTraySwitch.OnContent = L.T("close.tray.on");
+        CloseTraySwitch.OffContent = L.T("close.tray.off");
         TxtLangTitle.Text = L.T("lang.title");
         TxtLangSub.Text = L.T("lang.subtitle");
         SecHotkey.Text = L.T("sec.hotkey");
@@ -127,6 +131,9 @@ public sealed partial class SettingsPage : UserControl
     public SettingsPage(AppServices app, MainWindow main)
     {
         InitializeComponent();
+        // 页面可持有焦点:ComboBox 选中后把焦点交回页面,否则带焦点的下拉
+        // 会被滚轮改选项(主题选完一滚就切回去的元凶)
+        IsTabStop = true;
         ApplyStrings();
         _app = app;
         _main = main;
@@ -185,6 +192,7 @@ public sealed partial class SettingsPage : UserControl
         {
             ThemeCombo.SelectedIndex = Math.Max(0, _themeOptions.FindIndex(o => o.Value == _app.ThemeChoice));
             AutostartSwitch.IsOn = StartupService.IsEnabled();
+            CloseTraySwitch.IsOn = _app.CloseToTray;
             LanguageCombo.SelectedIndex = Math.Max(0,
                 _languageOptions.FindIndex(o => o.Value == _app.Language));
 
@@ -222,6 +230,7 @@ public sealed partial class SettingsPage : UserControl
         _main.ApplyTheme(choice);
         _app.TrySaveCfg();
         _main.RefreshOverviewPalette();
+        BlurFocus(ThemeCombo);
     }
 
     // ------------------------------------------------------------------
@@ -249,6 +258,31 @@ public sealed partial class SettingsPage : UserControl
     }
 
     // ------------------------------------------------------------------
+    // 关窗行为(ui.close_to_tray):开 = X 隐藏进托盘(默认),关 = X 直接退出
+    // ------------------------------------------------------------------
+
+    private void CloseTraySwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _app.SetCloseToTray(CloseTraySwitch.IsOn);
+        _app.TrySaveCfg();
+    }
+
+    /// <summary>
+    /// 把焦点从下拉框挪回页面:WinUI 里带焦点的 ComboBox 会被滚轮改选项,
+    /// 选完主题一滚轮就"切回去"就是它。焦点交还页面后,滚轮恢复滚动页面。
+    /// </summary>
+    private void BlurFocus(ComboBox combo)
+    {
+        try
+        {
+            combo.IsDropDownOpen = false;
+            Focus(FocusState.Programmatic);
+        }
+        catch { /* 焦点挪不动也无碍:只是滚轮可能还会改下拉 */ }
+    }
+
+    // ------------------------------------------------------------------
     // 语言(1.3.0 起中英可切;重启生效——整套文案在启动时一次定型)
     // ------------------------------------------------------------------
 
@@ -260,6 +294,7 @@ public sealed partial class SettingsPage : UserControl
         if (lang == _app.Language) return;
         _app.SetLanguage(lang);
         _app.TrySaveCfg();
+        BlurFocus(LanguageCombo);
         _ = ShowRestartDialogAsync();
     }
 
@@ -296,7 +331,8 @@ public sealed partial class SettingsPage : UserControl
         {
             var exe = Path.Combine(AppContext.BaseDirectory, "AgentEye.exe");
             Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
-            Application.Current.Exit();
+            // 真退出走 ExitFromTray:关闭拦截放行 + 完整清理(托盘图标不残留)
+            _main.ExitFromTray();
         }
         catch
         {
@@ -745,6 +781,7 @@ public sealed partial class SettingsPage : UserControl
                 FBaseUrl.Text = def;
         }
         UpdateDetectPreview();
+        BlurFocus(FKind);
     }
 
     private void FBaseUrl_LostFocus(object sender, RoutedEventArgs e) => UpdateDetectPreview();
@@ -826,8 +863,17 @@ public sealed partial class SettingsPage : UserControl
     private void FillModelCombo(IReadOnlyList<string> models)
     {
         var current = FModel.Text;
-        FModel.ItemsSource = models;
+        // 填充是程序动作,不算用户选择:别触发 BlurFocus 抢走正在输入的焦点
+        _loading = true;
+        try { FModel.ItemsSource = models; }
+        finally { _loading = false; }
         FModel.Text = current;
+    }
+
+    private void FModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        BlurFocus(FModel);
     }
 
     private async void BtnSave_Click(object sender, RoutedEventArgs e)

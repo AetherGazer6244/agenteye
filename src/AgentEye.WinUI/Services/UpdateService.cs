@@ -214,6 +214,9 @@ public sealed class UpdateService
                 Progress = 100,
                 Message = L.T("update.launching"),
             });
+            // 放行关窗拦截:安装器经 Restart Manager 关闭本应用并重启,
+            // 拦截若不放行会卡死静默升级(安装器契约 CloseApplications=yes)
+            AgentEye.MainWindow.CloseAllowedByUpdate = true;
             Process.Start(new ProcessStartInfo(setupPath, UpdateApplier.SilentInstallArgs)
             {
                 UseShellExecute = true,
