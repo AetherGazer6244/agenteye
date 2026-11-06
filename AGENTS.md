@@ -100,8 +100,8 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 
 ## 图标资源契约
 
-- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(几何风瓦片:
-  托盘蓝圆角方底 #285A96 + 白色 A 字笔画 + 瞳孔点 #8FC4F2),
+- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(字母 A:
+  实心窄高 A,托盘蓝 #285A96,无瞳孔、无底板),
   16/20/24/32/40/48/64/128/256 九档、**32bpp BMP 条目**(不能改成 PNG 压缩
   条目——Inno 的 `SetupIconFile` 吃不下)。
   由 `tools\make_icon.py` 生成(Pillow,dev-only,不在构建流程里);

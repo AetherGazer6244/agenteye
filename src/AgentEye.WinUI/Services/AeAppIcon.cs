@@ -4,7 +4,7 @@ using Microsoft.UI.Windowing;
 namespace AgentEye.WinUI.Services;
 
 /// <summary>
-/// 应用图标统一入口(A 标 + 瞳孔,托盘蓝)。
+/// 应用图标统一入口(字母 A,托盘蓝)。
 ///
 /// 资源:Assets\AgentEye.ico —— 同一份文件既被 csproj 的 ApplicationIcon 内嵌进 exe,
 /// 也随输出复制到 exe 同级 Assets 目录,供运行时按绝对路径喂给窗口 API。

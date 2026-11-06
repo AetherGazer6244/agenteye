@@ -11,7 +11,7 @@
     <Version>1.4.1</Version>
     <FileVersion>1.4.1.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- 应用图标(A 标 + 瞳孔,托盘蓝):内嵌进 exe,
+    <!-- 应用图标(字母 A,托盘蓝):内嵌进 exe,
          资源管理器/任务栏/快捷方式/卸载项/toast 全部跟着变 -->
     <ApplicationIcon>Assets\AgentEye.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
