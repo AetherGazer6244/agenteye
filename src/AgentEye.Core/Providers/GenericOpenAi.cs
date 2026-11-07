@@ -43,11 +43,11 @@ public static class GenericOpenAi
         {
             var (label, path, parse) = QuotaProbes[i];
             var isLast = i + 1 >= QuotaProbes.Length;
-            var (ok, status, body) = await Http.GetJsonAsync(
+            var (ok, status, body, why) = await Http.GetJsonAsync(
                 bas + path, headers, Http.DefaultTimeoutSec, ct);
             if (!ok)
             {
-                errors.Add(L.F("gen.labelNet", label));
+                errors.Add(Http.WithReason(L.F("gen.labelNet", label), why));
                 continue;
             }
             if (status == 401)
@@ -139,7 +139,7 @@ public static class GenericOpenAi
         var bas = (e.BaseUrl ?? "").TrimEnd('/');
         var url = bas.EndsWith("/v1") ? bas + "/chat/completions"
             : bas + "/v1/chat/completions";
-        var (ok, status, _) = await Http.PostJsonAsync(url,
+        var (ok, status, _, _) = await Http.PostJsonAsync(url,
             new Dictionary<string, string> { ["Authorization"] = $"Bearer {e.ApiKey}" },
             new Dictionary<string, object?>
             {
@@ -166,13 +166,13 @@ public static class GenericOpenAi
         if (key.Length == 0) return new ModelsOutcome(null, L.T("gen.noKey"));
 
         var modelsUrl = bas.EndsWith("/v1") ? bas + "/models" : bas + "/v1/models";
-        var (ok, status, body) = await Http.GetJsonAsync(modelsUrl,
+        var (ok, status, body, why) = await Http.GetJsonAsync(modelsUrl,
             new Dictionary<string, string>
             {
                 ["Authorization"] = $"Bearer {key}",
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return new ModelsOutcome(null, L.T("pr.netErr"));
+        if (!ok) return new ModelsOutcome(null, Http.NetErrText(why));
         if (status is 401 or 403) return new ModelsOutcome(null, L.F("pr.keyInvalid", status));
         if (status == 404) return new ModelsOutcome(null, L.T("gen.noModels"));
         if (status != 200) return new ModelsOutcome(null, $"HTTP {status}");

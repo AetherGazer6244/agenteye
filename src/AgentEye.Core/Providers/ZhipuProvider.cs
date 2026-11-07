@@ -36,14 +36,14 @@ public static class ZhipuProvider
             return FetchPayload.Err(L.T("pr.noKey"), unconfigured: true);
 
         var bas = string.IsNullOrEmpty(e.BaseUrl) ? DefaultBase : e.BaseUrl.TrimEnd('/');
-        var (ok, status, body) = await Http.GetJsonAsync(bas + Path,
+        var (ok, status, body, why) = await Http.GetJsonAsync(bas + Path,
             new Dictionary<string, string>
             {
                 // 智谱这一端点用裸 key,不带 Bearer 前缀
                 ["Authorization"] = key,
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
+        if (!ok) return FetchPayload.Err(Http.NetErrText(why));
         if (status is 401 or 403) return FetchPayload.Err(L.F("pr.keyInvalid", status));
         if (status != 200) return FetchPayload.Err($"HTTP {status}");
         if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));

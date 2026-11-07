@@ -92,10 +92,10 @@ public static class UpdateChecker
             ["X-GitHub-Api-Version"] = "2022-11-28",
         };
 
-        var (ok, status, body) = await Http.GetJsonAsync(url, headers, TimeoutSec, ct);
+        var (ok, status, body, why) = await Http.GetJsonAsync(url, headers, TimeoutSec, ct);
         if (!ok)
             return new UpdateCheckResult(UpdateCheckStatus.NetworkError, null,
-                L.T("upd.net"));
+                Http.WithReason(L.T("upd.net"), why));
         if (status == 404)
             return new UpdateCheckResult(UpdateCheckStatus.NoRelease, null,
                 L.T("upd.noReleases"));

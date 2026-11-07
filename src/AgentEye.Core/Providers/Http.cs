@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -14,8 +15,35 @@ public static class Http
 
     public const int DefaultTimeoutSec = 12;
 
-    /// <summary>GET 并解析 JSON。网络层异常返回 (ok:false, 0, default)。</summary>
-    public static async Task<(bool Ok, int Status, JsonElement Body)> GetJsonAsync(
+    // ---------------- 网络错误摘要(错误行 detail 带底层原因) ----------------
+
+    /// <summary>网络失败文案:有摘要时带原因(如「代理 127.0.0.1:9652 拒绝连接」)。</summary>
+    public static string NetErrText(string? why) => why is { Length: > 0 }
+        ? L.F("pr.netErrWhy", why)
+        : L.T("pr.netErr");
+
+    /// <summary>在既有失败文案(probe 模板带端点 label)后追加原因。无摘要时原样返回。</summary>
+    public static string WithReason(string baseText, string? why) =>
+        why is { Length: > 0 } ? $"{baseText}: {why}" : baseText;
+
+    /// <summary>异常摘要:超时给专门短语;其余取异常消息、压空白、截 100 字符。
+    /// 摘要随返回值元组传给调用方——AsyncLocal 写入不会向上传播到 await
+    /// 调用方的上下文(实测踩坑),静态字段在并发拉取下会串线,都不能用。</summary>
+    private static string Describe(Exception e)
+    {
+        if (e is TaskCanceledException) return L.T("pr.netTimeoutWhy");
+        var msg = e.Message.Replace('\n', ' ').Replace('\r', ' ');
+        while (msg.Contains("  ")) msg = msg.Replace("  ", " ");
+        msg = msg.Trim();
+        return msg.Length > 100 ? msg[..97] + "..." : msg;
+    }
+
+    /// <summary>
+    /// GET 并解析 JSON。网络层异常返回 (ok:false, 0, default, 摘要);
+    /// 摘要给「代理 X 拒绝连接」这类底层原因,调用方经 NetErrText 拼文案。
+    /// </summary>
+    public static async Task<(bool Ok, int Status, JsonElement Body, string? NetErr)>
+        GetJsonAsync(
         string url, IReadOnlyDictionary<string, string>? headers, int timeoutSec,
         CancellationToken ct = default)
     {
@@ -30,37 +58,38 @@ public static class Http
             using var resp = await Client.SendAsync(req,
                 HttpCompletionOption.ResponseContentRead, cts.Token);
             if (!resp.IsSuccessStatusCode)
-                return (true, (int)resp.StatusCode, default);
+                return (true, (int)resp.StatusCode, default, null);
             var text = await resp.Content.ReadAsStringAsync(cts.Token);
             try
             {
                 var doc = JsonDocument.Parse(text);
-                return (true, 200, doc.RootElement.Clone());
+                return (true, 200, doc.RootElement.Clone(), null);
             }
             catch (JsonException)
             {
                 // 200 但响应非 JSON:让调用方按"非JSON"分支处理
-                return (true, 200, JsonDocument.Parse("\"<not-json>\"").RootElement);
+                return (true, 200, JsonDocument.Parse("\"<not-json>\"").RootElement, null);
             }
         }
         catch (Exception e) when (
             e is HttpRequestException or TaskCanceledException
                 or InvalidOperationException or SocketExceptionPlaceholder)
         {
-            return (false, 0, default);
+            return (false, 0, default, Describe(e));
         }
     }
 
     /// <summary>内部占位:SocketException 在不同 TFM 上类型不同,统一按网络错。</summary>
     public sealed class SocketExceptionPlaceholder : Exception { }
 
-    /// <summary>POST JSON 并解析(中转站登录)。</summary>
-    public static Task<(bool Ok, int Status, JsonElement? Body)> PostJsonAsync(
+    /// <summary>POST JSON 并解析(中转站登录)。网络层异常带摘要,同 GetJsonAsync。</summary>
+    public static Task<(bool Ok, int Status, JsonElement? Body, string? NetErr)> PostJsonAsync(
         string url, object payload, int timeoutSec, CancellationToken ct = default) =>
         PostJsonAsync(url, null, payload, timeoutSec, ct);
 
     /// <summary>POST JSON 并解析,可带额外 headers(模型探测)。</summary>
-    public static async Task<(bool Ok, int Status, JsonElement? Body)> PostJsonAsync(
+    public static async Task<(bool Ok, int Status, JsonElement? Body, string? NetErr)>
+        PostJsonAsync(
         string url, Dictionary<string, string>? headers, object payload,
         int timeoutSec, CancellationToken ct = default)
     {
@@ -78,21 +107,21 @@ public static class Http
             using var resp = await Client.SendAsync(req,
                 HttpCompletionOption.ResponseContentRead, cts.Token);
             if (resp.StatusCode != System.Net.HttpStatusCode.OK)
-                return (true, (int)resp.StatusCode, null);
+                return (true, (int)resp.StatusCode, null, null);
             var text = await resp.Content.ReadAsStringAsync(cts.Token);
             try
             {
-                return (true, 200, JsonDocument.Parse(text).RootElement.Clone());
+                return (true, 200, JsonDocument.Parse(text).RootElement.Clone(), null);
             }
             catch (JsonException)
             {
-                return (true, 200, null);
+                return (true, 200, null, null);
             }
         }
         catch (Exception e) when (
             e is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
-            return (false, 0, null);
+            return (false, 0, null, Describe(e));
         }
     }
 

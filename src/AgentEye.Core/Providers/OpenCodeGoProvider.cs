@@ -58,9 +58,9 @@ public static class OpenCodeGoProvider
         var urls = UsageUrls(e.BaseUrl);
         for (var i = 0; i < urls.Count; i++)
         {
-            var (ok, status, respBody) = await Http.GetJsonAsync(
+            var (ok, status, respBody, why) = await Http.GetJsonAsync(
                 urls[i], headers, Http.DefaultTimeoutSec, ct);
-            if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
+            if (!ok) return FetchPayload.Err(Http.NetErrText(why));
             if (status == 401)
                 // 鉴权层拒绝与路径无关,不需要回退
                 return FetchPayload.Err(L.F("pr.keyInvalid", 401));

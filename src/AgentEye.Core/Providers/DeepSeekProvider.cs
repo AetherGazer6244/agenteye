@@ -20,13 +20,13 @@ public static class DeepSeekProvider
         if (key.Length == 0)
             return FetchPayload.Err(L.T("pr.noKey"), unconfigured: true);
 
-        var (ok, status, body) = await Http.GetJsonAsync(bas + "/user/balance",
+        var (ok, status, body, why) = await Http.GetJsonAsync(bas + "/user/balance",
             new Dictionary<string, string>
             {
                 ["Authorization"] = $"Bearer {key}",
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
+        if (!ok) return FetchPayload.Err(Http.NetErrText(why));
         if (status is 401 or 403) return FetchPayload.Err(L.F("pr.keyInvalid", status));
         if (status != 200) return FetchPayload.Err($"HTTP {status}");
         if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));

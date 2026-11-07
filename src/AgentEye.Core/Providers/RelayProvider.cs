@@ -45,10 +45,10 @@ public static class RelayProvider
             if (TokenCache.TryGetValue(key, out var cached) && cached.Expiry > Http.Now())
                 return (cached.Token, null);
         }
-        var (ok, status, body) = await Http.PostJsonAsync(bas + LoginPath,
+        var (ok, status, body, why) = await Http.PostJsonAsync(bas + LoginPath,
             new Dictionary<string, object?> { ["email"] = email, ["password"] = password },
             Http.DefaultTimeoutSec, ct);
-        if (!ok) return (null, L.T("rl.net"));
+        if (!ok) return (null, Http.WithReason(L.T("rl.net"), why));
         if (status != 200) return (null, $"HTTP {status}");
         if (body is not { ValueKind: System.Text.Json.JsonValueKind.Object } b)
             return (null, L.T("pr.notJson"));
@@ -121,11 +121,11 @@ public static class RelayProvider
             foreach (var (kind, path) in Candidates)
             {
                 if (useAccessToken && kind == "new_api") continue;
-                var (ok, status, body) = await Http.GetJsonAsync(
+                var (ok, status, body, why) = await Http.GetJsonAsync(
                     bas + path, headers, Http.DefaultTimeoutSec, ct);
                 if (!ok)
                 {
-                    errors.Add(L.F("rl.pathNet", path));
+                    errors.Add(Http.WithReason(L.F("rl.pathNet", path), why));
                     continue;
                 }
                 if (status == 401 && useAccessToken && !relogged)

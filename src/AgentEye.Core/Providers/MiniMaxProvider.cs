@@ -109,13 +109,13 @@ public static partial class MiniMaxProvider
         var path = plan == "coding_plan" ? CodingPath : TokenPath;
         var url = Host(e) + path;
 
-        var (ok, status, body) = await Http.GetJsonAsync(url,
+        var (ok, status, body, why) = await Http.GetJsonAsync(url,
             new Dictionary<string, string>
             {
                 ["Authorization"] = $"Bearer {key}",
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return FetchPayload.Err(L.T("pr.netErr"));
+        if (!ok) return FetchPayload.Err(Http.NetErrText(why));
         if (status is 401 or 403) return FetchPayload.Err(L.F("pr.keyInvalid", status));
         if (status != 200) return FetchPayload.Err($"HTTP {status}");
         if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));

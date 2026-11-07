@@ -235,6 +235,8 @@ public static class L
         // —— Core:provider 通用 ——
         ["pr.noKey"] = "未配置 api_key",
         ["pr.netErr"] = "网络错误: 网络异常",
+        ["pr.netErrWhy"] = "网络错误: {0}",
+        ["pr.netTimeoutWhy"] = "请求超时",
         ["pr.keyInvalid"] = "key 无效 (HTTP {0})",
         ["pr.notJson"] = "响应非 JSON",
         ["pr.apiError"] = "接口报错: {0}",
@@ -558,6 +560,8 @@ public static class L
         // —— Core: providers, common ——
         ["pr.noKey"] = "api_key not configured",
         ["pr.netErr"] = "Network error",
+        ["pr.netErrWhy"] = "Network error: {0}",
+        ["pr.netTimeoutWhy"] = "request timed out",
         ["pr.keyInvalid"] = "Invalid key (HTTP {0})",
         ["pr.notJson"] = "Response is not JSON",
         ["pr.apiError"] = "API error: {0}",
