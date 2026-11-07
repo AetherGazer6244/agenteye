@@ -92,6 +92,10 @@ public sealed class TrayIconService : IDisposable
     [DllImport("user32.dll")]
     private static extern bool PostMessageW(nint hWnd, uint msg, nint wp, nint lp);
     [DllImport("user32.dll")]
+    private static extern bool PostThreadMessageW(uint threadId, uint msg, nint wp, nint lp);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint pid);
+    [DllImport("user32.dll")]
     private static extern nint GetWindowLongPtrW(nint hWnd, int idx);
     [DllImport("user32.dll")]
     private static extern nint SetWindowLongPtrW(nint hWnd, int idx, nint value);
@@ -189,6 +193,8 @@ public sealed class TrayIconService : IDisposable
                 TranslateMessage(ref msg);
                 DispatchMessageW(ref msg);
             }
+            // 循环退出(WM_QUIT)后在本线程销毁窗口:DestroyWindow 只能由创建窗口的线程调
+            DestroyWindow(_hwndValue);
         }
     }
 
@@ -343,8 +349,19 @@ public sealed class TrayIconService : IDisposable
         RemoveIcon();
         if (_icon != nint.Zero) { try { DestroyIcon(_icon); } catch { } }
         _quit = true;
-        if (_hwnd != nint.Zero) { try { PostMessageW(_hwnd, 0x0010, nint.Zero, nint.Zero); } catch { } } // WM_CLOSE
+        // WM_QUIT 直接投给线程队列:GetMessage 收到即返回 0,循环退出。
+        // 旧实现用 WM_CLOSE:只销毁窗口,循环仍阻塞在 GetMessage,Join 白等 1 秒。
+        if (_hwnd != nint.Zero)
+        {
+            try
+            {
+                var tid = GetWindowThreadProcessId(_hwnd, out _);
+                if (tid != 0) PostThreadMessageW(tid, 0x0012, nint.Zero, nint.Zero); // WM_QUIT
+            }
+            catch { /* 增强面 */ }
+        }
         try { _thread?.Join(1000); } catch { }
+        // 兜底:线程没退出(极端情况)时跨线程 DestroyWindow 会失败,无害
         if (_hwnd != nint.Zero) { try { DestroyWindow(_hwnd); } catch { } }
     }
 }

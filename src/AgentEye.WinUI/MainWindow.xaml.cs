@@ -406,11 +406,29 @@ public sealed partial class MainWindow : Window
         catch { /* 关窗路径绝不因写盘失败崩溃 */ }
     }
 
-    /// <summary>真退出(托盘菜单"退出"/更新重启):绕过关窗进托盘拦截,走完整清理。</summary>
+    /// <summary>
+    /// 真退出(托盘菜单"退出"/更新重启):绕过关窗进托盘拦截,走完整清理。
+    /// 托盘菜单在 tray 线程上调本方法,而 Window.Close 只能在 UI 线程调——
+    /// 跨线程调用抛 RPC_E_WRONG_THREAD 且被 ShowMenu 的 catch 吞掉,表现就是
+    /// "托盘退出点了没反应"(1.4.1 实测踩坑);且 _forceClose 已置位不回滚,
+    /// 下一次点 X 会被误放行。所以统一封送 UI 线程执行,失败回滚 _forceClose。
+    /// </summary>
     public void ExitFromTray()
     {
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            ExitCore();
+            return;
+        }
+        DispatcherQueue.TryEnqueue(() => ExitCore());
+    }
+
+    private void ExitCore()
+    {
+        if (_closed) return;
         _forceClose = true;
-        Close();
+        try { Close(); }
+        catch { _forceClose = false; }
     }
 
     /// <summary>高级设置:立即改主窗口尺寸并落盘(物理像素)。</summary>
