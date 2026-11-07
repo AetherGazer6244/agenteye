@@ -5,7 +5,7 @@
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls">
 
     <ScrollViewer Padding="20,4,20,20" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="6" MaxWidth="560" HorizontalAlignment="Left">
+        <StackPanel Spacing="8" MaxWidth="560" HorizontalAlignment="Left">
 
             <!-- 外观 -->
             <TextBlock x:Name="SecAppearance" Style="{StaticResource AeSectionHeaderStyle}" />
@@ -18,14 +18,16 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE790;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE790;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtThemeTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                         <TextBlock x:Name="TxtThemeSub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
-                    <ComboBox x:Name="ThemeCombo" Grid.Column="2" MinWidth="120"
+                    <ComboBox x:Name="ThemeCombo" Grid.Column="2" MinWidth="128"
                               DisplayMemberPath="Text"
                               VerticalAlignment="Center"
                               SelectionChanged="ThemeCombo_SelectionChanged" />
@@ -40,8 +42,10 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE768;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE768;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtAutostartTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                         <TextBlock x:Name="TxtAutostartSub"
@@ -61,8 +65,10 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE921;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE921;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtCloseTrayTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                         <TextBlock x:Name="TxtCloseTraySub"
@@ -82,14 +88,16 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE774;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE774;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtLangTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                         <TextBlock x:Name="TxtLangSub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
-                    <ComboBox x:Name="LanguageCombo" Grid.Column="2" MinWidth="120"
+                    <ComboBox x:Name="LanguageCombo" Grid.Column="2" MinWidth="128"
                               DisplayMemberPath="Text"
                               VerticalAlignment="Center"
                               SelectionChanged="LanguageCombo_SelectionChanged" />
@@ -106,8 +114,10 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE765;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE765;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtHotkeyTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                         <TextBlock x:Name="TxtHotkeySub"
@@ -135,8 +145,10 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                                  Glyph="&#xE7BA;" />
+                        <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                            <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                      Glyph="&#xE7BA;" />
+                        </Border>
                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                             <TextBlock x:Name="TxtAlertTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                             <TextBlock x:Name="TxtAlertSub"
@@ -224,7 +236,7 @@
                             </Grid.RowDefinitions>
 
                             <TextBlock x:Name="TxtKindLabel" VerticalAlignment="Center" />
-                            <ComboBox x:Name="FKind" Grid.Column="1" MinWidth="120"
+                            <ComboBox x:Name="FKind" Grid.Column="1" MinWidth="128"
                                       DisplayMemberPath="Text"
                                       HorizontalAlignment="Left"
                                       SelectionChanged="FKind_SelectionChanged" />
@@ -266,8 +278,10 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                                  Glyph="&#xE90C;" />
+                        <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                            <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                      Glyph="&#xE90C;" />
+                        </Border>
                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                             <TextBlock x:Name="TxtSizeTitle"
                                        Style="{StaticResource AeSettingsItemTitleStyle}" />
@@ -311,8 +325,10 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE946;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE946;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                         <TextBlock x:Name="TxtAboutTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
                         <TextBlock x:Name="TxtAboutSub"

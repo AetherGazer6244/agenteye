@@ -10,33 +10,44 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" x:Name="TxtOverviewTitle" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Grid.Row="0" x:Name="TxtOverviewTitle" FontSize="18" FontWeight="SemiBold" />
 
         <Grid Grid.Row="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="RowsHost" Spacing="10" />
+                <StackPanel x:Name="RowsHost" Spacing="8" />
             </ScrollViewer>
 
             <!-- 空态(暂停/刷新入口在窗口头部图标,这里只引导去设置) -->
             <StackPanel x:Name="EmptyState" Spacing="10"
                         VerticalAlignment="Center" HorizontalAlignment="Center"
                         Visibility="Collapsed">
+                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                          FontSize="26" Glyph="&#xE710;"
+                          Foreground="{ThemeResource AeTextSecondaryBrush}"
+                          HorizontalAlignment="Center" />
                 <TextBlock x:Name="TxtEmpty" Foreground="{ThemeResource AeTextSecondaryBrush}" />
                 <Button x:Name="BtnOpenSettings" Click="OpenSettings_Click" />
             </StackPanel>
         </Grid>
 
-        <!-- 页脚:刷新时间 + 数量(两列自适应,窄窗口不打架) -->
+        <!-- 页脚:刷新时间 + 数量,各做成小胶囊(底部视觉锚点;两列自适应,窄窗口不打架) -->
         <Grid Grid.Row="2" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock x:Name="FooterUpdated" Grid.Column="0" FontSize="11"
-                       Foreground="{ThemeResource AeTextSecondaryBrush}"
-                       TextTrimming="CharacterEllipsis" />
-            <TextBlock x:Name="FooterCount" Grid.Column="1" FontSize="11"
-                       Foreground="{ThemeResource AeTextSecondaryBrush}" />
+            <Border Grid.Column="0" CornerRadius="4" Padding="8,3"
+                    Background="{ThemeResource AeSubtleFillBrush}"
+                    HorizontalAlignment="Left">
+                <TextBlock x:Name="FooterUpdated" FontSize="11"
+                           Foreground="{ThemeResource AeTextSecondaryBrush}"
+                           TextTrimming="CharacterEllipsis" />
+            </Border>
+            <Border Grid.Column="1" CornerRadius="4" Padding="8,3"
+                    Background="{ThemeResource AeSubtleFillBrush}">
+                <TextBlock x:Name="FooterCount" FontSize="11"
+                           Foreground="{ThemeResource AeTextSecondaryBrush}" />
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

@@ -1,4 +1,5 @@
 using AgentEye.Core.Localization;
+using AgentEye.Core.Providers;
 using AgentEye.WinUI.Pages;
 using AgentEye.WinUI.Services;
 using AgentEye.WinUI.Tray;
@@ -156,6 +157,15 @@ public sealed partial class MainWindow : Window
         PageHost.Children.Add(_settings);
         ShowPage("overview");
 
+        // 主题在 ctor 里设过一次,但 Root 那时还没走完首次布局,
+        // 部分场景(先建页再改主题的时序)会渲染回退;树加载后再应用一次,
+        // 保证 dark/light 配置启动即生效(实测 B/C 两轮构建复现过浅色残留)。
+        ApplyTheme(_app.ThemeChoice);
+
+        // 头部状态胶囊:随刷新更新(ResultsChanged 约定在 UI 线程触发)
+        _app.ResultsChanged += UpdateStatusPill;
+        UpdateStatusPill();
+
         _app.Poller.Start();
 
         // 空配置首启也刷一轮:让"未配置"空态立刻可见
@@ -200,7 +210,11 @@ public sealed partial class MainWindow : Window
 
         // 主题跟随系统:auto 时系统切换会触发这里,同步按钮配色即可,
         // 页面/小组件各自监听 ActualThemeChanged 重渲染
-        Root.ActualThemeChanged += (_, _) => SyncCaptionButtons();
+        Root.ActualThemeChanged += (_, _) =>
+        {
+            SyncCaptionButtons();
+            UpdateStatusPill();   // 点色是代码取的画刷,主题切换后要重取
+        };
 
         // 标题栏右侧留白 = 物理像素换算 DIP,别硬编码
         try
@@ -269,6 +283,49 @@ public sealed partial class MainWindow : Window
         BtnBack.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
         AppTitle.Text = tag == "overview" ? "AgentEye" : L.T("win.titleSettings");
     }
+
+    // ---------------- 头部状态胶囊 ----------------
+
+    /// <summary>
+    /// 头部胶囊:最紧张 provider 的等级色点 + provider 数。
+    /// ResultsChanged / 主题切换时重刷;窗口关闭后不再更新(_closed 兜底)。
+    /// </summary>
+    private void UpdateStatusPill()
+    {
+        if (_closed || StatusPill is null) return;
+        var rows = _app.Results;
+        if (rows.Count == 0)
+        {
+            StatusPill.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var worst = rows.OrderBy(SeverityOf).First().Level;
+        try
+        {
+            StatusDot.Fill = AeRes.Brush(Root, worst switch
+            {
+                Levels.Critical => "AeCriticalBrush",
+                Levels.Error => "AeErrorBrush",
+                Levels.Warn => "AeWarnBrush",
+                Levels.Ok => "AeOkBrush",
+                _ => "AePausedBrush",
+            });
+        }
+        catch { /* 主题资源未就绪等:胶囊仍显示文案 */ }
+        StatusPillText.Text = L.F("ov.count", rows.Count);
+        StatusPill.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>等级严重度排序:紧张 &gt; 异常 &gt; 注意 &gt; 未配置 &gt; 暂停 &gt; 正常(小 = 严重)。</summary>
+    private static int SeverityOf(ProviderResult r) => r.Level switch
+    {
+        Levels.Critical => 0,
+        Levels.Error => 1,
+        Levels.Warn => 2,
+        Levels.Unconfigured => 3,
+        Levels.Paused => 4,
+        _ => 5,
+    };
 
     // ---------------- 头部图标按钮 ----------------
 

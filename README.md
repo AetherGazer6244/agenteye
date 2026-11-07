@@ -3,14 +3,16 @@
 Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 紧凑面板 +
 托盘常驻 + 桌面小组件,盯着各平台 API 额度,快烧完时提前告警。
 
-![version](https://img.shields.io/badge/version-v1.4.0-blue)
+![version](https://img.shields.io/badge/version-v1.5.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B%20%2F%2011-blueviolet)
 ![runtime](https://img.shields.io/badge/runtime-.NET%208%20%2B%20WinAppSDK%201.7-5C2D91)
 
 <p align="center">
-  <img src="docs/screenshots/main.png" width="380" alt="主面板(总览页)" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/screenshots/widget.png" width="260" alt="桌面小组件" />
+  <img src="docs/screenshots/main.png" width="280" alt="主面板(浅色)" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/main-dark.png" width="280" alt="主面板(深色)" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/widget.png" width="180" alt="桌面小组件" />
 </p>
 
 > 与 Python/Tkinter 原版(存于 `main` 与 `feat/glass-redesign` 分支历史)共用

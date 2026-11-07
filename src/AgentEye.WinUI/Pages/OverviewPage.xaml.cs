@@ -4,14 +4,13 @@ using AgentEye.WinUI.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Shapes;
 
 namespace AgentEye.WinUI.Pages;
 
 /// <summary>
-/// 总览页:provider 行扁平化直排在玻璃上(36px kind 图标 + 名称/主值 +
-/// 3px 等级色细条 + 1px 分割线),行随刷新整批重建,
-/// 对齐 Python 版 Panel 的重建语义。
+/// 总览页:provider 行卡片化直排在玻璃上(白卡 + 1px 描边 + 圆角 8;
+/// 28px 图标底板 + 名称/等级 pill/detail + 18px 主值 + 4px 等级条),
+/// 行随刷新整批重建,对齐 Python 版 Panel 的重建语义。
 /// </summary>
 public sealed partial class OverviewPage : UserControl
 {
@@ -51,16 +50,8 @@ public sealed partial class OverviewPage : UserControl
         EmptyState.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         RowsHost.Children.Clear();
-        for (var i = 0; i < rows.Count; i++)
-        {
-            RowsHost.Children.Add(BuildRow(rows[i]));
-            if (i < rows.Count - 1)
-                RowsHost.Children.Add(new Rectangle
-                {
-                    Height = 1,
-                    Fill = AeRes.Brush(this, "AeDividerBrush"),
-                });
-        }
+        foreach (var row in rows)
+            RowsHost.Children.Add(BuildRow(row));
     }
 
     private Brush LevelBrush(string level) => AeRes.Brush(this, level switch
@@ -79,7 +70,7 @@ public sealed partial class OverviewPage : UserControl
 
     /// <summary>等级色的淡版,当进度条轨道用(0% 剩余时也能看出等级)。</summary>
     private static Brush LevelTrack(Brush level) => level is SolidColorBrush s
-        ? new SolidColorBrush(Windows.UI.Color.FromArgb(48, s.Color.R, s.Color.G, s.Color.B))
+        ? new SolidColorBrush(Windows.UI.Color.FromArgb(28, s.Color.R, s.Color.G, s.Color.B))
         : level;
 
     /// <summary>kind → Segoe Fluent Icons 字形,未知 kind 落其它。</summary>
@@ -93,29 +84,68 @@ public sealed partial class OverviewPage : UserControl
         _ => "\uE774",
     };
 
+    /// <summary>名称旁等级 pill 的配色与文案;暂停行显示"已暂停"。</summary>
+    private (Brush Brush, string Text) LevelPillInfo(ProviderResult row)
+    {
+        if (row.Paused || row.Level == Levels.Paused)
+            return (AeRes.Brush(this, "AePausedBrush"), L.T("ov.paused"));
+        return row.Level switch
+        {
+            Levels.Ok => (AeRes.Brush(this, "AeOkBrush"), L.T("ov.level.ok")),
+            Levels.Warn => (AeRes.Brush(this, "AeWarnBrush"), L.T("ov.level.warn")),
+            Levels.Critical => (AeRes.Brush(this, "AeCriticalBrush"), L.T("ov.level.critical")),
+            Levels.Error => (AeRes.Brush(this, "AeErrorBrush"), L.T("ov.error")),
+            _ => (AeRes.Brush(this, "AePausedBrush"), L.T("ov.unconfigured")),
+        };
+    }
+
+    /// <summary>等级 pill:淡等级底 + 等级色字(与进度条轨道同一套淡版算法)。</summary>
+    private FrameworkElement BuildLevelPill(Brush brush, string text)
+    {
+        var tint = brush is SolidColorBrush s
+            ? new SolidColorBrush(Windows.UI.Color.FromArgb(30, s.Color.R, s.Color.G, s.Color.B))
+            : brush;
+        return new Border
+        {
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 1, 6, 1),
+            Background = tint,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock { Text = text, FontSize = 11, Foreground = brush },
+        };
+    }
+
     private FrameworkElement BuildRow(ProviderResult row)
     {
-        var stack = new StackPanel { Spacing = 6 };
+        // 卡片容器:白底 + 1px 描边 + 圆角 8,行与行靠卡片边界分隔(无分割线)
+        var card = new Border
+        {
+            Background = AeRes.Brush(this, "AeCardBrush"),
+            BorderBrush = AeRes.Brush(this, "AeCardStrokeBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12),
+        };
+        var stack = new StackPanel { Spacing = 8 };
 
-        // 上半:36px 图标 + (名称行 / detail) + 主值
+        // 上半:28px 图标底板 + (名称行 / detail) + 主值
         var top = new Grid { ColumnSpacing = 10 };
-        top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var pausedBrush = AeRes.Brush(this, "AePausedBrush");
         var iconChip = new Border
         {
-            Width = 36,
-            Height = 36,
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(1),
-            BorderBrush = AeRes.Brush(this, "AeCardStrokeBrush"),
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(6),
+            Background = AeRes.Brush(this, "AeSubtleFillBrush"),
             VerticalAlignment = VerticalAlignment.Top,
             Child = new FontIcon
             {
                 FontFamily = new FontFamily("Segoe Fluent Icons"),
-                FontSize = 16,
+                FontSize = 14,
                 Glyph = KindGlyph(row.Kind),
                 Foreground = row.Paused ? pausedBrush : DimBrush(),
             },
@@ -123,8 +153,9 @@ public sealed partial class OverviewPage : UserControl
         Grid.SetColumn(iconChip, 0);
         top.Children.Add(iconChip);
 
-        var mid = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
+        var mid = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
 
+        // 名称 + 等级 pill(暂停时 pill 显示"已暂停",替代旧的行内"已暂停"小字)
         var nameRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         nameRow.Children.Add(new TextBlock
         {
@@ -133,66 +164,84 @@ public sealed partial class OverviewPage : UserControl
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = TextBrush(),
             VerticalAlignment = VerticalAlignment.Center,
-            // 名字可能被挤窄,裁剪而不是撑破布局
+            // 列宽约束 + 裁剪;不设 MaxWidth,窄窗口靠 Grid 自适应
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxWidth = 180,
         });
-        if (row.Paused)
-            nameRow.Children.Add(new TextBlock
-            {
-                Text = L.T("ov.paused"),
-                FontSize = 11,
-                Foreground = DimBrush(),
-                VerticalAlignment = VerticalAlignment.Center,
-            });
+        var (pillBrush, pillText) = LevelPillInfo(row);
+        nameRow.Children.Add(BuildLevelPill(pillBrush, pillText));
         mid.Children.Add(nameRow);
 
+        // detail:允许两行折行(长文案不再被单行截断),超出再裁
         var detail = row.Detail;
         if (row.Error is not null) detail = row.Error;
         mid.Children.Add(new TextBlock
         {
             Text = detail,
             FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            MaxLines = 2,
             TextTrimming = TextTrimming.CharacterEllipsis,
             Foreground = DimBrush(),
         });
         Grid.SetColumn(mid, 1);
         top.Children.Add(mid);
 
-        // 右列:主值(剩余/已用)
+        // 右列:主值 18 SemiBold;余额类在下方补一行 11 Secondary 单位
+        var valueStack = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
         var mainValue = new TextBlock
         {
-            FontSize = 16,
+            FontSize = 18,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             Foreground = TextBrush(),
-            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right,
         };
+        string? unitLine = null;
         if (row.Level == Levels.Unconfigured)
+        {
+            // 未配置:降级成次级文案,不抢主值的视觉位
+            mainValue.FontSize = 12;
+            mainValue.FontWeight = Microsoft.UI.Text.FontWeights.Normal;
+            mainValue.Foreground = DimBrush();
             mainValue.Text = L.T("ov.unconfigured");
+        }
+        else if (row.Error is not null)
+        {
+            mainValue.Text = "!";
+            mainValue.FontSize = 16;
+            mainValue.Foreground = LevelBrush(row.Level);
+        }
         else if (row.Pct is not null)
             mainValue.Text = $"{Http.F0(row.Pct.Value)}%";
         else if (row.Remaining is not null)
-            mainValue.Text = $"{Http.F2(row.Remaining.Value)}{row.Unit}";
+        {
+            mainValue.Text = Http.F2(row.Remaining.Value);
+            unitLine = row.Unit;
+        }
         else
             mainValue.Text = row.Level == Levels.Error ? L.T("ov.error") : "-";
-        if (row.Error is not null && row.Level != Levels.Unconfigured)
-        {
-            mainValue.Text = "!";
-            mainValue.Foreground = LevelBrush(row.Level);
-        }
-        Grid.SetColumn(mainValue, 2);
-        top.Children.Add(mainValue);
+
+        valueStack.Children.Add(mainValue);
+        if (unitLine is not null)
+            valueStack.Children.Add(new TextBlock
+            {
+                Text = unitLine,
+                FontSize = 11,
+                Foreground = DimBrush(),
+                HorizontalAlignment = HorizontalAlignment.Right,
+            });
+        Grid.SetColumn(valueStack, 2);
+        top.Children.Add(valueStack);
 
         stack.Children.Add(top);
 
-        // 下半:3px 等级色细条(整行宽,无值时空轨)
+        // 下半:4px 等级色条(收在卡片内,圆角 2;无值时空轨)
         var level = LevelBrush(row.Level);
         var bar = new ProgressBar
         {
             Minimum = 0,
             Maximum = 100,
-            Height = 3,
-            CornerRadius = new CornerRadius(1.5),
+            Height = 4,
+            CornerRadius = new CornerRadius(2),
             Foreground = level,
             // 轨道也带等级色:剩余 0% 时填充为空,不然等级完全看不出来
             Background = LevelTrack(level),
@@ -200,7 +249,7 @@ public sealed partial class OverviewPage : UserControl
         if (row.Pct is not null) bar.Value = Math.Clamp(row.Pct.Value, 0, 100);
         stack.Children.Add(bar);
 
-        var host = new Grid { Children = { stack } };
+        card.Child = stack;
 
         // 行右键菜单(对齐 Python row_menu:暂停/编辑/删除)
         var menu = new MenuFlyout();
@@ -219,9 +268,9 @@ public sealed partial class OverviewPage : UserControl
         miDelete.Click += async (_, _) => await SettingsPage.ConfirmDeleteAsync(
             _app, this, row.Name);
         menu.Items.Add(miDelete);
-        host.ContextFlyout = menu;
+        card.ContextFlyout = menu;
 
-        return host;
+        return card;
     }
 
     private void TogglePause(string name)

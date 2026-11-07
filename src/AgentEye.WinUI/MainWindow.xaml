@@ -27,11 +27,28 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal"
-                        VerticalAlignment="Center" Margin="16,0,8,0">
-                <Ellipse Width="12" Height="12" Margin="0,0,8,0"
-                         Fill="{ThemeResource AccentFillColorDefaultBrush}" />
-                <TextBlock x:Name="AppTitle" Text="AgentEye" VerticalAlignment="Center"
+                        VerticalAlignment="Center" Margin="16,0,8,0" Spacing="8">
+                <!-- 品牌标:18×18 蓝底圆角 "A"(与 .ico 同款托盘蓝,纯文本非图片) -->
+                <Border Width="18" Height="18" CornerRadius="5" Background="#285A96"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="A" FontSize="11" FontWeight="SemiBold"
+                               Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock x:Name="AppTitle" Text="AgentEye" FontSize="13"
+                           FontWeight="SemiBold" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" />
+                <!-- 状态胶囊:最紧张等级的点 + provider 数(ResultsChanged 时更新) -->
+                <Border x:Name="StatusPill" CornerRadius="4" Padding="8,2"
+                        Background="{ThemeResource AeSubtleFillBrush}"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <Ellipse x:Name="StatusDot" Width="6" Height="6"
+                                 VerticalAlignment="Center" />
+                        <TextBlock x:Name="StatusPillText" FontSize="11"
+                                   Foreground="{ThemeResource AeTextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <StackPanel x:Name="HeaderButtons" Grid.Column="1" Orientation="Horizontal"
