@@ -19,7 +19,7 @@ public static class UpdateDownloader
         Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromMinutes(10));
-        using var resp = await Http.Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        using var resp = await GetResponseAsync(url, cts.Token);
         if (!resp.IsSuccessStatusCode)
             throw new IOException(L.F("dl.http", (int)resp.StatusCode));
         var total = resp.Content.Headers.ContentLength ?? 0;
@@ -39,6 +39,34 @@ public static class UpdateDownloader
         if (total > 0 && done != total)
             throw new IOException(L.F("dl.incomplete", done, total));
         return destFile;
+    }
+
+    /// <summary>
+    /// 下载响应:选路语义与 Http.SendAsync 一致——Auto 模式下系统代理网络层失败
+    /// 就换直连重试一次(面板直连能刷出来,下载器也得跟着直连,不然更新卡死在
+    /// 死代理上);suspect 窗口内先直连。状态记忆不用维护:轮询每轮都在刷。
+    /// </summary>
+    private static async Task<HttpResponseMessage> GetResponseAsync(
+        string url, CancellationToken ct)
+    {
+        var firstIsDirect = Http.Mode switch
+        {
+            ProxyMode.Direct => true,
+            ProxyMode.System => false,
+            _ => Http.Status.Suspect,
+        };
+        var first = firstIsDirect ? Http.DirectClient : Http.Client;
+        try
+        {
+            return await first.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (Exception e) when (
+            Http.Mode == ProxyMode.Auto &&
+            e is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            var fb = firstIsDirect ? Http.Client : Http.DirectClient;
+            return await fb.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
     }
 
     /// <summary>文件 sha256(小写十六进制)。</summary>

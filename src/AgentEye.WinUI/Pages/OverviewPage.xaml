@@ -14,7 +14,32 @@
 
         <Grid Grid.Row="1">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="RowsHost" Spacing="8" />
+                <StackPanel Spacing="8">
+
+                    <!-- 代理兜底横幅:系统代理判死、已自动改直连时提示(平时不占位) -->
+                    <Border x:Name="ProxyBanner" Visibility="Collapsed"
+                            Background="{ThemeResource AeCardBrush}"
+                            BorderBrush="{ThemeResource AeCardStrokeBrush}"
+                            BorderThickness="1" CornerRadius="8" Padding="12,10">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" FontFamily="Segoe Fluent Icons"
+                                      FontSize="14" Glyph="&#xE7BA;"
+                                      Foreground="{ThemeResource AeErrorBrush}" />
+                            <TextBlock Grid.Column="1" x:Name="BannerText" FontSize="12"
+                                       TextWrapping="Wrap" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource AeTextSecondaryBrush}" />
+                            <Button Grid.Column="2" x:Name="BtnProxyRetry"
+                                    VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <StackPanel x:Name="RowsHost" Spacing="8" />
+                </StackPanel>
             </ScrollViewer>
 
             <!-- 空态(暂停/刷新入口在窗口头部图标,这里只引导去设置) -->

@@ -45,6 +45,8 @@ public sealed class AppServices
             // 配置不可用(读锁等):按空配置跑,禁止任何写盘,等用户处理
             Cfg = ConfigStore.Template();
         }
+        // 代理模式启动注入(Core.Http 静态属性,零 UI 依赖)
+        Http.Mode = Http.ParseMode(ProxyModeChoice);
         Poller = new PollerService(this);
         Notify = new NotifyService();
         Update = new UpdateService(this);
@@ -93,6 +95,23 @@ public sealed class AppServices
     {
         var ui = UiDict();
         ui["theme"] = choice;
+    }
+
+    /// <summary>
+    /// 代理模式(ui.proxy_mode):auto=跟随系统代理带直连兜底(缺省)/
+    /// system=严格跟随 / direct=忽略代理直连。ui 自由字典加键,
+    /// schema_version 仍为 2,Python 版 merge 会保留未知键。
+    /// </summary>
+    public string ProxyModeChoice =>
+        Cfg.TryGetValue("ui", out var u) && u is Dictionary<string, object?> ui &&
+        ui.TryGetValue("proxy_mode", out var pm) && pm is string pms && pms.Length > 0
+            ? pms : "auto";
+
+    public void SetProxyMode(string mode)
+    {
+        UiDict()["proxy_mode"] = mode;
+        Http.Mode = Http.ParseMode(mode);
+        Http.ResetProxyState(); // 别让旧的「代理疑似不可用」记忆污染新模式
     }
 
     /// <summary>

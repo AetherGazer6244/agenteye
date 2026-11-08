@@ -28,6 +28,7 @@ public static class L
     {
         // —— 设置页:分节 ——
         ["sec.appearance"] = "外观",
+        ["sec.network"] = "网络",
         ["sec.hotkey"] = "快捷键",
         ["sec.alert"] = "告警",
         ["sec.api"] = "API 管理",
@@ -56,6 +57,18 @@ public static class L
         // —— 设置页:语言 ——
         ["lang.title"] = "语言",
         ["lang.subtitle"] = "界面语言(切换后重启生效)",
+
+        // —— 设置页:网络 + Core:Http 代理容错(1.5.2) ——
+        ["net.proxyModeTitle"] = "代理模式",
+        ["net.proxyModeSub"] = "系统代理拒连时自动改直连兜底",
+        ["net.proxyMode.auto"] = "跟随系统代理(自动兜底)",
+        ["net.proxyMode.system"] = "严格跟随系统代理",
+        ["net.proxyMode.direct"] = "忽略系统代理(直连)",
+        ["net.proxyDead"] = "系统代理 {0} 无响应({1})",
+        ["net.proxyBothFailed"] = "系统代理 {0} 无响应({1});直连失败:{2}",
+        ["net.reason.refused"] = "连接被拒绝",
+        ["net.reason.dns"] = "域名解析失败",
+        ["net.reason.unreachable"] = "网络不可达",
 
         // —— 设置页:快捷键 ——
         ["hotkey.title"] = "唤醒快捷键",
@@ -137,6 +150,8 @@ public static class L
         ["ov.error"] = "错误",
         ["ov.resume"] = "恢复轮询",
         ["ov.pause"] = "暂停此 provider",
+        ["ov.proxyBanner"] = "系统代理 {0} 无响应,已自动改直连",
+        ["ov.proxyRetry"] = "重试",
 
         // —— 热键状态(设置页回显/弹窗) ——
         ["hotkey.svcDown"] = "热键服务不可用",
@@ -353,6 +368,7 @@ public static class L
     {
         // —— Settings: sections ——
         ["sec.appearance"] = "Appearance",
+        ["sec.network"] = "Network",
         ["sec.hotkey"] = "Hotkey",
         ["sec.alert"] = "Alerts",
         ["sec.api"] = "API keys",
@@ -381,6 +397,18 @@ public static class L
         // —— Settings: language ——
         ["lang.title"] = "Language",
         ["lang.subtitle"] = "UI language (takes effect after restart)",
+
+        // —— Settings: network + Core:Http proxy fallback (1.5.2) ——
+        ["net.proxyModeTitle"] = "Proxy mode",
+        ["net.proxyModeSub"] = "Fall back to a direct connection when the system proxy refuses",
+        ["net.proxyMode.auto"] = "Follow system proxy (auto fallback)",
+        ["net.proxyMode.system"] = "Follow system proxy strictly",
+        ["net.proxyMode.direct"] = "Ignore system proxy (direct)",
+        ["net.proxyDead"] = "System proxy {0} unreachable ({1})",
+        ["net.proxyBothFailed"] = "System proxy {0} unreachable ({1}); direct connection failed: {2}",
+        ["net.reason.refused"] = "connection refused",
+        ["net.reason.dns"] = "DNS lookup failed",
+        ["net.reason.unreachable"] = "network unreachable",
 
         // —— Settings: hotkey ——
         ["hotkey.title"] = "Wake-up hotkey",
@@ -462,6 +490,8 @@ public static class L
         ["ov.error"] = "Error",
         ["ov.resume"] = "Resume polling",
         ["ov.pause"] = "Pause this provider",
+        ["ov.proxyBanner"] = "System proxy {0} unreachable; switched to direct",
+        ["ov.proxyRetry"] = "Retry",
 
         // —— hotkey status (settings echo / dialog) ——
         ["hotkey.svcDown"] = "Hotkey service unavailable",

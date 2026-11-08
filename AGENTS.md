@@ -178,6 +178,14 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 - 关窗行为:`ui.close_to_tray`(缺省 true = X 隐藏进托盘,false = X 直接
   退出);启动时 `StartupService.EnsureCurrent()` 自愈注册表旧路径,
   镜像值以注册表为准回填。
+- 代理模式:`ui.proxy_mode`(缺省 "auto" = 跟随系统代理,代理拒连/超时自动
+  直连兜底;system = 严格跟随不做兜底;direct = 忽略代理直连)。ui 自由
+  字典加键,schema_version 仍为 2,Python 版 merge 保留未知键。判死的代理
+  地址只记进程内(10 分钟窗口,`Http.Status`),总览页出「已自动改直连」
+  横幅;设置页切模式即时生效并立即刷一轮。代理地址问
+  `HttpClient.DefaultProxy.GetProxy` 拿,不自己读注册表(.NET 8 的
+  DefaultProxy 是进程级快照,.NET 9 起才监听注册表变化——别依赖运行期
+  系统代理变更被自动看见)。
 
 ## 设置页版式契约(卡片行模板)
 

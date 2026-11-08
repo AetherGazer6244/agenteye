@@ -104,6 +104,33 @@
                 </Grid>
             </Border>
 
+            <!-- 网络 -->
+            <TextBlock x:Name="SecNetwork" Style="{StaticResource AeSectionHeaderStyle}" />
+
+            <!-- 代理模式:系统代理拒连时自动直连兜底(1.5.2) -->
+            <Border Style="{StaticResource AeSettingsItemStyle}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE702;" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtProxyTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtProxySub"
+                                   Style="{StaticResource AeSettingsItemSubtitleStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="ProxyModeCombo" Grid.Column="2" MinWidth="128"
+                              DisplayMemberPath="Text"
+                              VerticalAlignment="Center"
+                              SelectionChanged="ProxyModeCombo_SelectionChanged" />
+                </Grid>
+            </Border>
+
             <!-- 快捷键 -->
             <TextBlock x:Name="SecHotkey" Style="{StaticResource AeSectionHeaderStyle}" />
 

@@ -69,6 +69,14 @@ public sealed partial class SettingsPage : UserControl
         new(L.T("kind.generic_openai"), "generic_openai"),
     ];
 
+    // 代理模式(1.5.2):auto=跟随系统代理并带直连兜底(缺省)
+    private readonly List<ProxyModeOption> _proxyModeOptions =
+    [
+        new(L.T("net.proxyMode.auto"), "auto"),
+        new(L.T("net.proxyMode.system"), "system"),
+        new(L.T("net.proxyMode.direct"), "direct"),
+    ];
+
     /// <summary>有官方默认端点的 kind(base_url 可留空,拉取层有 fallback)。</summary>
     private static readonly string[] OfficialKinds = ["deepseek", "zhipu", "minimax", "opencode_go"];
 
@@ -88,6 +96,9 @@ public sealed partial class SettingsPage : UserControl
         CloseTraySwitch.OffContent = L.T("close.tray.off");
         TxtLangTitle.Text = L.T("lang.title");
         TxtLangSub.Text = L.T("lang.subtitle");
+        SecNetwork.Text = L.T("sec.network");
+        TxtProxyTitle.Text = L.T("net.proxyModeTitle");
+        TxtProxySub.Text = L.T("net.proxyModeSub");
         SecHotkey.Text = L.T("sec.hotkey");
         TxtHotkeyTitle.Text = L.T("hotkey.title");
         TxtHotkeySub.Text = L.T("hotkey.subtitle");
@@ -140,6 +151,7 @@ public sealed partial class SettingsPage : UserControl
         ThemeCombo.ItemsSource = _themeOptions;
         LanguageCombo.ItemsSource = _languageOptions;
         FKind.ItemsSource = _kindOptions;
+        ProxyModeCombo.ItemsSource = _proxyModeOptions;
         LoadGeneral();
         ReloadList();
         app.ConfigSaved += ReloadList;
@@ -195,6 +207,8 @@ public sealed partial class SettingsPage : UserControl
             CloseTraySwitch.IsOn = _app.CloseToTray;
             LanguageCombo.SelectedIndex = Math.Max(0,
                 _languageOptions.FindIndex(o => o.Value == _app.Language));
+            ProxyModeCombo.SelectedIndex = Math.Max(0,
+                _proxyModeOptions.FindIndex(o => o.Value == _app.ProxyModeChoice));
 
             HotkeyBox.Text = _app.HotkeyText;
 
@@ -266,6 +280,23 @@ public sealed partial class SettingsPage : UserControl
         if (_loading) return;
         _app.SetCloseToTray(CloseTraySwitch.IsOn);
         _app.TrySaveCfg();
+    }
+
+    // ------------------------------------------------------------------
+    // 代理模式(ui.proxy_mode):Auto=跟随系统代理带直连兜底(默认)/ System / Direct
+    // ------------------------------------------------------------------
+
+    private void ProxyModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (ProxyModeCombo.SelectedIndex < 0) return;
+        var mode = _proxyModeOptions[ProxyModeCombo.SelectedIndex].Value;
+        if (mode == _app.ProxyModeChoice) return;
+        _app.SetProxyMode(mode);
+        _app.TrySaveCfg();
+        BlurFocus(ProxyModeCombo);
+        // 立即按新模式拉一轮:兜底开没开,下一秒面板上就能看出来
+        _ = _app.Poller.RefreshNowAsync();
     }
 
     /// <summary>
@@ -977,4 +1008,6 @@ public sealed partial class SettingsPage : UserControl
     private sealed record LanguageOption(string Text, string Value);
 
     private sealed record KindOption(string Text, string Value);
+
+    private sealed record ProxyModeOption(string Text, string Value);
 }

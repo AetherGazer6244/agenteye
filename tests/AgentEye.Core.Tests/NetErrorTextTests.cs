@@ -9,7 +9,10 @@ namespace AgentEye.Core.Tests;
 /// (如「代理 127.0.0.1:9652 拒绝连接」),经 NetErrText/WithReason
 /// 拼进卡片明细,不再只有笼统的「网络异常」。
 /// 连本机必拒端口触发真实 HttpRequestException(连接即时被拒,不耗时)。
+/// ProxyTests 会在测试里改 HttpClient.DefaultProxy(进程级静态),
+/// 两者入同一 collection 串行跑,互不污染。
 /// </summary>
+[Collection("http-global")]
 public class NetErrorTextTests
 {
     [Fact]
