@@ -4,15 +4,24 @@ using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
-/// <summary>代理模式(ui.proxy_mode):Auto=跟随系统代理并带直连兜底(默认)。</summary>
+/// <summary>请求路线:直连(绕开系统代理)或走系统代理。</summary>
+public enum NetRoute
+{
+    /// <summary>直连,无视系统代理。</summary>
+    Direct,
+    /// <summary>走系统代理(env 变量 → WinINET → PAC 全由 .NET 决定)。</summary>
+    Proxy,
+}
+
+/// <summary>代理模式(ui.proxy_mode):Direct=直连优先(缺省),Auto=代理优先,System=只代理。</summary>
 public enum ProxyMode
 {
-    /// <summary>跟随系统代理;代理拒连/超时自动改直连重试一次(默认)。</summary>
-    Auto,
-    /// <summary>严格走系统代理,不做兜底。</summary>
-    System,
-    /// <summary>忽略系统代理,一律直连。</summary>
+    /// <summary>直连优先:先直连,网络层失败才回退系统代理(缺省,死代理彻底不参与)。</summary>
     Direct,
+    /// <summary>跟随系统代理:先系统代理,失败才直连(覆盖只有代理能通的中转站)。</summary>
+    Auto,
+    /// <summary>严格跟随系统代理:只走代理,不做任何兜底。</summary>
+    System,
 }
 
 /// <summary>共享 HttpClient + 适配器用的 JSON/格式化小工具。</summary>
@@ -21,7 +30,7 @@ public static class Http
     /// <summary>系统代理客户端(共享)。属性可写是给测试换替身留的缝,产品代码别动。</summary>
     public static HttpClient Client { get; set; } = CreateClient(useProxy: true);
 
-    /// <summary>直连客户端(无视系统代理):Auto 模式兜底与 Direct 模式专用。</summary>
+    /// <summary>直连客户端(无视系统代理)。与系统代理 Client 并存,按路线顺序取用。</summary>
     public static HttpClient DirectClient { get; set; } = CreateClient(useProxy: false);
 
     private static HttpClient CreateClient(bool useProxy) => new(
@@ -37,29 +46,30 @@ public static class Http
     // ------------------------------------------------------------------
 
     /// <summary>当前代理模式。启动时由壳层按 ui.proxy_mode 注入;设置页切换即时生效。</summary>
-    public static ProxyMode Mode { get; set; } = ProxyMode.Auto;
+    public static ProxyMode Mode { get; set; } = ProxyMode.Direct;
 
-    /// <summary>文本 → 模式;未知/空一律 Auto(手改 config 写错值不至于断网)。</summary>
+    /// <summary>文本 → 模式;未知/空一律 Direct(手改 config 写错值不至于被死代理拖死)。</summary>
     public static ProxyMode ParseMode(string? raw) => raw switch
     {
+        "auto" => ProxyMode.Auto,
         "system" => ProxyMode.System,
-        "direct" => ProxyMode.Direct,
-        _ => ProxyMode.Auto,
+        _ => ProxyMode.Direct,
     };
 
     /// <summary>
-    /// 代理「疑似不可用」窗口:判死后窗口内请求先直连,省掉每轮一次注定失败的
-    /// 系统代理重试(代理挂起而非拒连时一次就是整个超时);过期自动复探系统代理,
-    /// 代理恢复即自动切回。
+    /// 「路线疑似不可用」记忆:刚在网络层失败的那条路记 10 分钟,窗口内把它挪到
+    /// 尝试顺序末尾,省掉每轮一次注定失败的尝试(挂起而非拒连时一次就是整个
+    /// 超时);该路走通即解除,过期自动复探。只记进程内,不出任何横幅/通知。
     /// </summary>
     private static readonly TimeSpan SuspectTtl = TimeSpan.FromMinutes(10);
     private static readonly object Gate = new();
+    private static NetRoute? _suspectRoute;
     private static Uri? _suspectProxy;
     private static string? _suspectReason;
     private static DateTimeOffset _suspectUntil = DateTimeOffset.MinValue;
 
-    /// <summary>代理状态快照(总览横幅用):Proxy=判死的代理地址,Suspect=兜底直连生效中。</summary>
-    public sealed record ProxyState(Uri? Proxy, bool Suspect, string? Reason);
+    /// <summary>路线状态快照:Suspect=被判降权的路线,Proxy=代理路线失败时的代理地址。</summary>
+    public sealed record ProxyState(NetRoute? Suspect, Uri? Proxy, string? Reason);
 
     public static ProxyState Status
     {
@@ -69,18 +79,40 @@ public static class Http
             {
                 var active = DateTimeOffset.Now < _suspectUntil;
                 return new ProxyState(
-                    active ? _suspectProxy : null, active, active ? _suspectReason : null);
+                    active ? _suspectRoute : null,
+                    active ? _suspectProxy : null,
+                    active ? _suspectReason : null);
             }
         }
     }
 
-    private static void MarkSuspect(Uri target, Exception? err)
+    /// <summary>
+    /// 本轮尝试顺序:模式给基础顺序(Direct=直连优先 / Auto=代理优先 /
+    /// System=只代理),刚失败过的路线挪到末尾。SendAsync 与下载器选路共用。
+    /// </summary>
+    public static NetRoute[] RouteOrder(ProxyMode mode)
     {
-        // 代理地址拿不到就不记:横幅没处显示;此时兜底决策退化为「每轮先试系统代理」
-        var proxy = EffectiveProxy(target);
-        if (proxy is null) return;
+        if (mode == ProxyMode.System) return [NetRoute.Proxy];
+        var directFirst = mode == ProxyMode.Direct;
         lock (Gate)
         {
+            if (DateTimeOffset.Now < _suspectUntil && _suspectRoute is { } bad &&
+                directFirst == (bad == NetRoute.Direct))
+                directFirst = !directFirst; // 首位正是刚失败的路 → 换到次位
+        }
+        return directFirst ? [NetRoute.Direct, NetRoute.Proxy] : [NetRoute.Proxy, NetRoute.Direct];
+    }
+
+    /// <summary>当前首选路线(受 suspect 记忆影响)。下载器选第一跳用。</summary>
+    public static NetRoute FirstRoute => RouteOrder(Mode)[0];
+
+    private static void MarkSuspect(NetRoute route, Uri target, Exception? err)
+    {
+        // 代理路线失败时顺手记下代理地址(文案/诊断用),直连路线失败不记地址
+        Uri? proxy = route == NetRoute.Proxy ? EffectiveProxy(target) : null;
+        lock (Gate)
+        {
+            _suspectRoute = route;
             _suspectProxy = proxy;
             _suspectReason = err is null ? null : Describe(err);
             _suspectUntil = DateTimeOffset.Now + SuspectTtl;
@@ -89,10 +121,14 @@ public static class Http
 
     private static void ClearSuspect()
     {
-        lock (Gate) _suspectUntil = DateTimeOffset.MinValue;
+        lock (Gate)
+        {
+            _suspectRoute = null;
+            _suspectUntil = DateTimeOffset.MinValue;
+        }
     }
 
-    /// <summary>清掉「代理疑似不可用」记忆。设置页切代理模式后调,新模式立刻干净生效。</summary>
+    /// <summary>清掉路线记忆。设置页切代理模式后调,新模式立刻干净生效。</summary>
     public static void ResetProxyState() => ClearSuspect();
 
     /// <summary>
@@ -162,23 +198,24 @@ public static class Http
         return Describe(e);
     }
 
-    /// <summary>单路失败文案:能确定代理地址时点明「系统代理 X 无响应」,否则回退原始摘要。</summary>
-    private static string SingleErrText(Uri target, Exception? err)
+    /// <summary>
+    /// 单条路线的失败文案:代理路线点名代理地址(能查到时)配短因;直连路线给
+    /// 「直连失败:原始摘要」——摘要自带目标地址,比压短后的固定短语更有用。
+    /// </summary>
+    private static string RouteErrText(NetRoute route, Uri target, Exception err)
     {
-        if (err is null) return L.T("pr.netErr");
+        if (route == NetRoute.Direct) return L.F("net.directFailed", Describe(err));
         var proxy = EffectiveProxy(target);
         return proxy is null ? Describe(err) : L.F("net.proxyDead", proxy.Authority, Classify(err));
     }
 
-    /// <summary>双路皆败:系统代理侧为主因(用户环境里代理多半是根因),直连失败附在后面。</summary>
-    private static string BothErrText(Uri target, Exception? primary, Exception? fallback)
+    /// <summary>全部路线皆败:按尝试顺序把每条路的原因拼起来(首选路的排前面)。</summary>
+    private static string AllFailedText(NetRoute[] order, Uri target, Exception[] errs)
     {
-        if (primary is null) return L.T("pr.netErr");
-        var proxy = EffectiveProxy(target);
-        if (proxy is null) return Describe(primary);
-        return fallback is null
-            ? L.F("net.proxyDead", proxy.Authority, Classify(primary))
-            : L.F("net.proxyBothFailed", proxy.Authority, Classify(primary), Describe(fallback));
+        var parts = new string[order.Length];
+        for (var i = 0; i < order.Length; i++)
+            parts[i] = RouteErrText(order[i], target, errs[i]);
+        return string.Join(";", parts);
     }
 
     // ------------------------------------------------------------------
@@ -219,12 +256,12 @@ public static class Http
     }
 
     /// <summary>
-    /// 统一请求出口(带代理兜底):
-    /// - Auto:正常先走系统代理;网络层失败换直连重试一次,直连通了记 suspect
-    ///   (窗口内后续请求先直连);系统代理这条道走通了就清掉。直连首发失败时
-    ///   反向回试系统代理,覆盖「只有代理能通」的海外中转站场景。
-    /// - System:只走系统代理;Direct:只直连。
-    /// 网络失败文案能确定代理地址时点明「系统代理 X 无响应」,不再只给裸 .NET 消息。
+    /// 统一请求出口(按路线顺序尝试):
+    /// - Direct(缺省):直连优先,网络层失败才走系统代理;
+    /// - Auto:代理优先,失败才直连(覆盖只有代理能通的海外中转站);
+    /// - System:只走代理。
+    /// 首选路失败即记入 suspect 窗口(下轮把它挪到末尾,省掉注定失败的尝试);
+    /// 被怀疑的路走通了就解除。全败文案按尝试顺序点名每条路的原因。
     /// </summary>
     private static async Task<(bool Ok, int Status, string? Text, string? NetErr)>
         SendAsync(HttpMethod method, string url,
@@ -232,40 +269,25 @@ public static class Http
         int timeoutSec, CancellationToken ct)
     {
         var target = new Uri(url);
-        var mode = Mode; // 快照:请求中途切设置不影响本轮
-        var firstIsDirect = mode switch
+        var order = RouteOrder(Mode); // 快照:请求中途切设置不影响本轮
+        var errs = new Exception[order.Length];
+        for (var i = 0; i < order.Length; i++)
         {
-            ProxyMode.Direct => true,
-            ProxyMode.System => false,
-            _ => Status.Suspect, // Auto:代理疑似挂了先直连
-        };
-        var first = firstIsDirect ? DirectClient : Client;
-        var fallback = mode == ProxyMode.Auto
-            ? (firstIsDirect ? Client : DirectClient) : null;
-
-        var (ok, status, text, err) =
-            await TryOnceAsync(first, method, target, headers, jsonPayload, timeoutSec, ct);
-        if (ok)
-        {
-            if (!firstIsDirect) ClearSuspect(); // 系统代理是通的 → 兜底状态该清了
-            return (true, status, text, null);
+            var route = order[i];
+            var wasSuspect = route == Status.Suspect;
+            var (ok, status, text, err) = await TryOnceAsync(
+                route == NetRoute.Direct ? DirectClient : Client,
+                method, target, headers, jsonPayload, timeoutSec, ct);
+            if (ok)
+            {
+                if (wasSuspect) ClearSuspect(); // 被怀疑的路走通了 → 解除,回基础顺序
+                return (true, status, text, null);
+            }
+            errs[i] = err!;
+            if (i == 0 && order.Length > 1)
+                MarkSuspect(route, target, err); // 首选路挂了:下轮把它挪到末尾
         }
-        if (fallback is null)
-            return (false, 0, null, SingleErrText(target, err));
-
-        var (ok2, status2, text2, err2) =
-            await TryOnceAsync(fallback, method, target, headers, jsonPayload, timeoutSec, ct);
-        if (ok2)
-        {
-            if (firstIsDirect) ClearSuspect(); // 直连不行、系统代理行 → 代理自己好了
-            else MarkSuspect(target, err);      // 系统代理不行、直通行 → 判死代理进兜底窗口
-            return (true, status2, text2, null);
-        }
-        if (firstIsDirect) ClearSuspect(); // 双路皆败且已先直连过:锅多半不在代理
-        else MarkSuspect(target, err);
-        // 主因取系统代理侧(有代理的环境里它才是根因),直连失败附在后面
-        return (false, 0, null,
-            BothErrText(target, firstIsDirect ? err2 : err, firstIsDirect ? err : err2));
+        return (false, 0, null, AllFailedText(order, target, errs));
     }
 
     /// <summary>

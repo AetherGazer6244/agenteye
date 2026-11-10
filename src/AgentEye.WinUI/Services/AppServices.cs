@@ -98,14 +98,14 @@ public sealed class AppServices
     }
 
     /// <summary>
-    /// 代理模式(ui.proxy_mode):auto=跟随系统代理带直连兜底(缺省)/
-    /// system=严格跟随 / direct=忽略代理直连。ui 自由字典加键,
+    /// 代理模式(ui.proxy_mode):direct=直连优先,连不上才回退系统代理(缺省)/
+    /// auto=跟随系统代理(代理优先)/ system=严格跟随不做兜底。ui 自由字典加键,
     /// schema_version 仍为 2,Python 版 merge 会保留未知键。
     /// </summary>
     public string ProxyModeChoice =>
         Cfg.TryGetValue("ui", out var u) && u is Dictionary<string, object?> ui &&
         ui.TryGetValue("proxy_mode", out var pm) && pm is string pms && pms.Length > 0
-            ? pms : "auto";
+            ? pms : "direct";
 
     public void SetProxyMode(string mode)
     {

@@ -42,29 +42,26 @@ public static class UpdateDownloader
     }
 
     /// <summary>
-    /// 下载响应:选路语义与 Http.SendAsync 一致——Auto 模式下系统代理网络层失败
-    /// 就换直连重试一次(面板直连能刷出来,下载器也得跟着直连,不然更新卡死在
-    /// 死代理上);suspect 窗口内先直连。状态记忆不用维护:轮询每轮都在刷。
+    /// 下载响应:选路语义与 Http.SendAsync 一致——按 Http.FirstRoute 先试
+    /// (面板能刷出来的那条路,下载器也得跟着走,不然更新卡死在死路上);
+    /// 网络层失败换另一条路重试一次(System 模式不兜底)。suspect 记忆由
+    /// 轮询维护,下载器只读不写。
     /// </summary>
     private static async Task<HttpResponseMessage> GetResponseAsync(
         string url, CancellationToken ct)
     {
-        var firstIsDirect = Http.Mode switch
-        {
-            ProxyMode.Direct => true,
-            ProxyMode.System => false,
-            _ => Http.Status.Suspect,
-        };
-        var first = firstIsDirect ? Http.DirectClient : Http.Client;
+        var mode = Http.Mode;
+        var first = Http.FirstRoute;
         try
         {
-            return await first.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            return await (first == NetRoute.Direct ? Http.DirectClient : Http.Client)
+                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         }
         catch (Exception e) when (
-            Http.Mode == ProxyMode.Auto &&
+            mode != ProxyMode.System &&
             e is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
-            var fb = firstIsDirect ? Http.Client : Http.DirectClient;
+            var fb = first == NetRoute.Direct ? Http.Client : Http.DirectClient;
             return await fb.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         }
     }

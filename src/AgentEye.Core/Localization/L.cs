@@ -58,14 +58,14 @@ public static class L
         ["lang.title"] = "语言",
         ["lang.subtitle"] = "界面语言(切换后重启生效)",
 
-        // —— 设置页:网络 + Core:Http 代理容错(1.5.2) ——
+        // —— 设置页:网络 + Core:Http 选路(1.5.2) ——
         ["net.proxyModeTitle"] = "代理模式",
-        ["net.proxyModeSub"] = "系统代理拒连时自动改直连兜底",
-        ["net.proxyMode.auto"] = "跟随系统代理(自动兜底)",
+        ["net.proxyModeSub"] = "默认直连,连不上才回退系统代理",
+        ["net.proxyMode.direct"] = "直连优先(默认)",
+        ["net.proxyMode.auto"] = "跟随系统代理(代理优先)",
         ["net.proxyMode.system"] = "严格跟随系统代理",
-        ["net.proxyMode.direct"] = "忽略系统代理(直连)",
         ["net.proxyDead"] = "系统代理 {0} 无响应({1})",
-        ["net.proxyBothFailed"] = "系统代理 {0} 无响应({1});直连失败:{2}",
+        ["net.directFailed"] = "直连失败:{0}",
         ["net.reason.refused"] = "连接被拒绝",
         ["net.reason.dns"] = "域名解析失败",
         ["net.reason.unreachable"] = "网络不可达",
@@ -150,8 +150,6 @@ public static class L
         ["ov.error"] = "错误",
         ["ov.resume"] = "恢复轮询",
         ["ov.pause"] = "暂停此 provider",
-        ["ov.proxyBanner"] = "系统代理 {0} 无响应,已自动改直连",
-        ["ov.proxyRetry"] = "重试",
 
         // —— 热键状态(设置页回显/弹窗) ——
         ["hotkey.svcDown"] = "热键服务不可用",
@@ -398,14 +396,14 @@ public static class L
         ["lang.title"] = "Language",
         ["lang.subtitle"] = "UI language (takes effect after restart)",
 
-        // —— Settings: network + Core:Http proxy fallback (1.5.2) ——
+        // —— Settings: network + Core:Http route selection (1.5.2) ——
         ["net.proxyModeTitle"] = "Proxy mode",
-        ["net.proxyModeSub"] = "Fall back to a direct connection when the system proxy refuses",
-        ["net.proxyMode.auto"] = "Follow system proxy (auto fallback)",
+        ["net.proxyModeSub"] = "Direct by default; system proxy only as a fallback",
+        ["net.proxyMode.direct"] = "Direct first (default)",
+        ["net.proxyMode.auto"] = "Follow system proxy (proxy first)",
         ["net.proxyMode.system"] = "Follow system proxy strictly",
-        ["net.proxyMode.direct"] = "Ignore system proxy (direct)",
         ["net.proxyDead"] = "System proxy {0} unreachable ({1})",
-        ["net.proxyBothFailed"] = "System proxy {0} unreachable ({1}); direct connection failed: {2}",
+        ["net.directFailed"] = "Direct connection failed: {0}",
         ["net.reason.refused"] = "connection refused",
         ["net.reason.dns"] = "DNS lookup failed",
         ["net.reason.unreachable"] = "network unreachable",
@@ -490,8 +488,6 @@ public static class L
         ["ov.error"] = "Error",
         ["ov.resume"] = "Resume polling",
         ["ov.pause"] = "Pause this provider",
-        ["ov.proxyBanner"] = "System proxy {0} unreachable; switched to direct",
-        ["ov.proxyRetry"] = "Retry",
 
         // —— hotkey status (settings echo / dialog) ——
         ["hotkey.svcDown"] = "Hotkey service unavailable",

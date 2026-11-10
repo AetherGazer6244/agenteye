@@ -69,12 +69,12 @@ public sealed partial class SettingsPage : UserControl
         new(L.T("kind.generic_openai"), "generic_openai"),
     ];
 
-    // 代理模式(1.5.2):auto=跟随系统代理并带直连兜底(缺省)
+    // 代理模式(1.5.2):direct=直连优先(缺省)/ auto=代理优先 / system=严格跟随
     private readonly List<ProxyModeOption> _proxyModeOptions =
     [
+        new(L.T("net.proxyMode.direct"), "direct"),
         new(L.T("net.proxyMode.auto"), "auto"),
         new(L.T("net.proxyMode.system"), "system"),
-        new(L.T("net.proxyMode.direct"), "direct"),
     ];
 
     /// <summary>有官方默认端点的 kind(base_url 可留空,拉取层有 fallback)。</summary>
@@ -283,7 +283,7 @@ public sealed partial class SettingsPage : UserControl
     }
 
     // ------------------------------------------------------------------
-    // 代理模式(ui.proxy_mode):Auto=跟随系统代理带直连兜底(默认)/ System / Direct
+    // 代理模式(ui.proxy_mode):Direct=直连优先(默认)/ Auto=代理优先 / System=严格跟随
     // ------------------------------------------------------------------
 
     private void ProxyModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)

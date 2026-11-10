@@ -27,8 +27,6 @@ public sealed partial class OverviewPage : UserControl
         TxtEmpty.Text = L.T("ov.empty");
         BtnOpenSettings.Content = L.T("ov.openSettings");
         FooterUpdated.Text = L.T("ov.notRefreshed");
-        BtnProxyRetry.Content = L.T("ov.proxyRetry");
-        BtnProxyRetry.Click += (_, _) => _ = _app.Poller.RefreshNowAsync();
         Loaded += (_, _) =>
         {
             _app.ResultsChanged += OnResultsChanged;
@@ -50,12 +48,6 @@ public sealed partial class OverviewPage : UserControl
             : L.T("ov.notRefreshed");
         FooterCount.Text = rows.Count == 0 ? "" : L.F("ov.count", rows.Count);
         EmptyState.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-
-        // 代理兜底横幅:Auto 模式判死系统代理并已改直连时提示(1.5.2)
-        var proxy = Http.Status;
-        var showBanner = proxy.Suspect && proxy.Proxy is not null;
-        ProxyBanner.Visibility = showBanner ? Visibility.Visible : Visibility.Collapsed;
-        if (showBanner) BannerText.Text = L.F("ov.proxyBanner", proxy.Proxy!.Authority);
 
         RowsHost.Children.Clear();
         foreach (var row in rows)
