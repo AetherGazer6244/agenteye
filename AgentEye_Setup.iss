@@ -14,9 +14,13 @@ AppPublisher=AgentEye Project
 ; 显式 AppId:升级链依赖它稳定(隐式取 AppName,改名即断链)
 AppId=AgentEye
 DefaultDirName=E:\AgentEye
-; auto:首装显示目录页,升级(同 AppId)隐藏并沿用旧目录
-DisableDirPage=auto
+; no:每次安装都显示目录页(升级预填旧目录,用户可改);
+; 静默升级(/VERYSILENT)不显示向导页,仍沿用旧目录
+DisableDirPage=no
 UsePreviousAppDir=yes
+; no:浏览目录时不再自动拼 "\AgentEye"(选哪装哪),并让对话框出现
+; 「新建文件夹」按钮——设 yes 时这个按钮不出现(见 Inno 文档)
+AppendDefaultDirName=no
 MinVersion=10.0.19041
 DefaultGroupName=AgentEye
 OutputDir=installer
@@ -39,8 +43,14 @@ RestartApplications=yes
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+chinesesimplified.RootDirNotAllowed=请不要直接安装到驱动器根目录,请选择或新建一个子文件夹。
+english.RootDirNotAllowed=Please do not install directly into a drive root. Choose or create a subfolder.
+
 [Tasks]
+; checkedonce:首装默认勾选,之后记住用户上次的选择(升级不反复打扰)
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式："; Flags: checkedonce
+Name: "startmenuicon"; Description: "创建开始菜单快捷方式"; GroupDescription: "快捷方式："; Flags: checkedonce
 Name: "autostart"; Description: "开机自动启动 AgentEye"; GroupDescription: "启动选项："; Flags: unchecked
 
 [Files]
@@ -50,12 +60,14 @@ Source: "{#SrcDir}\*"; DestDir: "{app}"; Excludes: "AgentEye_Setup.exe,config.js
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\AgentEye"; Filename: "{app}\AgentEye.exe"
+; 开始菜单整组(启动/说明/卸载)跟随 startmenuicon 任务;不勾时卸载入口
+; 仍在系统设置「应用」里(Uninstall 注册表由 Inno 自动写)
+Name: "{group}\AgentEye"; Filename: "{app}\AgentEye.exe"; Tasks: startmenuicon
 ; 用 {userdesktop} 而非 {commondesktop}:后者是 C:\Users\Public\Desktop,
 ; 非管理员安装(PrivilegesRequired=lowest)写不进去,快捷方式会静默失败
 Name: "{userdesktop}\AgentEye"; Filename: "{app}\AgentEye.exe"; Tasks: desktopicon
-Name: "{group}\说明 (README)"; Filename: "{app}\README.md"
-Name: "{group}\卸载 AgentEye"; Filename: "{uninstallexe}"
+Name: "{group}\说明 (README)"; Filename: "{app}\README.md"; Tasks: startmenuicon
+Name: "{group}\卸载 AgentEye"; Filename: "{uninstallexe}"; Tasks: startmenuicon
 
 [Registry]
 ; 开机自启(HKCU,无需管理员);应用内不提供开关,要关就在任务管理器→启动里禁用
@@ -63,3 +75,23 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\AgentEye.exe"; Description: "启动 AgentEye"; Flags: postinstall nowait skipifsilent shellexec
+
+[Code]
+// AppendDefaultDirName=no 后不再自动拼 "\AgentEye":防止用户一路点进
+// 驱动器根目录,把整套文件撒在 E:\ 根下。选根目录时拦一下,让用户
+// 新建 / 选择子文件夹(浏览对话框里有「新建文件夹」按钮)。
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpSelectDir then
+  begin
+    if Length(WizardDirValue) = 3 then
+    begin
+      if (WizardDirValue[2] = ':') and (WizardDirValue[3] = '\') then
+      begin
+        MsgBox(ExpandConstant('{cm:RootDirNotAllowed}'), mbError, MB_OK);
+        Result := False;
+      end;
+    end;
+  end;
+end;

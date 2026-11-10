@@ -65,8 +65,10 @@ Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 
 从 [Releases](https://github.com/AetherGazer6244/AgentEye/releases/latest)
 下载 `AgentEye_Setup.exe` 双击安装(Inno Setup,lzma2 压缩约 7.9 MB):
 
-- 按用户级安装(HKCU),**无需管理员**;默认装到 `E:\AgentEye`,全新安装可改目录
-- 可选桌面快捷方式与开机自启;开始菜单 / 系统设置「应用」自带卸载入口
+- 按用户级安装(HKCU),**无需管理员**;默认装到 `E:\AgentEye`,每次安装都
+  可改目录、可在浏览对话框里新建文件夹
+- 桌面 / 开始菜单快捷方式均可选(默认勾,升级记住上次选择);开机自启默认
+  不勾;不建开始菜单时卸载入口仍在系统设置「应用」
 - 升级时安装器经 Restart Manager 关闭运行中的应用,装完自动重启新版
 - 配置与缓存都在 `~\.agenteye\`,与安装位置无关,升级 / 重装不丢配置
 

@@ -49,7 +49,15 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 ## 安装器契约(AgentEye_Setup.iss)
 
 - `AppId=AgentEye` 显式写死——升级链依赖它稳定,改名即断链。
-- `DefaultDirName=E:\AgentEye` + `DisableDirPage=auto`(升级沿用旧目录)。
+- `DefaultDirName=E:\AgentEye` + `DisableDirPage=no`:每次安装都显示目录页,
+  升级预填旧目录(`UsePreviousAppDir=yes`)并允许修改;静默升级
+  (`/VERYSILENT`,应用内更新)不走向导,仍按旧目录覆盖。
+- `AppendDefaultDirName=no`:选目录后不再自动拼 `\AgentEye`(选哪装哪),
+  **同时让浏览对话框出现「新建文件夹」按钮**——设 `yes` 时该按钮不出现
+  (Inno 文档明确)。配套 `[Code]` 拦驱动器根目录,防止把文件撒在 `E:\`。
+- 快捷方式可选:`desktopicon` / `startmenuicon` 两个任务,`checkedonce`
+  (首装默认勾、升级记住上次选择);不勾开始菜单时整组不建,卸载入口仍在
+  系统设置「应用」。桌面用 `{userdesktop}`(非管理员写不进 Public Desktop)。
 - `PrivilegesRequired=lowest`,HKCU 注册表,无需管理员。
 - `CloseApplications=yes` + `RestartApplications=yes`:静默升级时安装器经
   Restart Manager 关掉运行中的应用、装完自动重启——**应用内更新靠这一对**,
