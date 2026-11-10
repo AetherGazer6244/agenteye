@@ -87,6 +87,7 @@ public sealed partial class MainWindow : Window
     private WidgetWindow? _widget;
     private HotkeyService? _hotkey;
     private string _hotkeyStatus = "";
+    private HotkeyState _hotkeyState = HotkeyState.Unknown;
     private bool _closed;
     private bool _forceClose;    // 托盘"退出"/更新重启置位:绕过关窗进托盘拦截
 
@@ -206,7 +207,17 @@ public sealed partial class MainWindow : Window
             _hotkey = new HotkeyService(TogglePanel);
             ApplyHotkey();
         }
-        catch { _hotkey = null; _hotkeyStatus = L.T("hotkey.svcDown"); }
+        catch
+        {
+            _hotkey = null;
+            _hotkeyStatus = L.T("hotkey.svcDown");
+            _hotkeyState = HotkeyState.ServiceDown;
+        }
+
+        // 热键没生效(被占用/组合非法/服务异常):正常启动时弹一次告知,
+        // 开机自启的静默启动不打扰(避免开机弹窗)
+        if (!HotkeyOk && !StartupService.HasMinimizedFlag())
+            DispatcherQueue.TryEnqueue(() => _ = ShowHotkeyWarningAsync());
 
         // 主题跟随系统:auto 时系统切换会触发这里,同步按钮配色即可,
         // 页面/小组件各自监听 ActualThemeChanged 重渲染
@@ -367,6 +378,28 @@ public sealed partial class MainWindow : Window
     /// <summary>当前热键状态文案(设置页回显;失败原因也在这里)。</summary>
     public string HotkeyStatus => _hotkeyStatus;
 
+    /// <summary>当前热键注册状态(设置页按状态判定要不要弹窗)。</summary>
+    public HotkeyState HotkeyState => _hotkeyState;
+
+    /// <summary>
+    /// 热键是否处在"没有毛病"的状态:已生效 / 用户主动关掉 / **还没装配**
+    /// (Unknown)。Unknown 必须算正常——热键服务是在 Root_Loaded 里后建的,
+    /// 页面初始化早于它,那时不能当成"服务不可用"(否则每次启动都误弹
+    /// 「快捷键未生效」)。
+    /// </summary>
+    public bool HotkeyOk => _hotkeyState is HotkeyState.Unknown
+        or HotkeyState.Active or HotkeyState.Disabled;
+
+    /// <summary>
+    /// 第二实例启动时的响应:把主面板叫到前台(静默启动 --minimized 时只保托盘,
+    /// 不弹面板,免得开机弹窗打扰)。
+    /// </summary>
+    public void ActivateFromSecondInstance(bool showPanel)
+    {
+        if (!showPanel) return;
+        WakeUp();
+    }
+
     /// <summary>按当前配置重注册全局热键(设置页改键后立即调用)。</summary>
     public void ApplyHotkey()
     {
@@ -375,12 +408,44 @@ public sealed partial class MainWindow : Window
             if (_hotkey is null)
             {
                 _hotkeyStatus = L.T("hotkey.svcDown");
+                _hotkeyState = HotkeyState.ServiceDown;
                 return;
             }
             _hotkey.Apply(_app.HotkeyText, _app.HotkeyUsable);
             _hotkeyStatus = _hotkey.Status;
+            _hotkeyState = _hotkey.State;
         }
-        catch { _hotkeyStatus = L.T("hotkey.applyFailed"); }
+        catch
+        {
+            _hotkeyStatus = L.T("hotkey.applyFailed");
+            _hotkeyState = HotkeyState.ApplyFailed;
+        }
+    }
+
+    /// <summary>
+    /// 热键注册失败的提示弹窗(启动时弹一次)。成功静默——设置页不搞常驻状态小字。
+    /// </summary>
+    private async Task ShowHotkeyWarningAsync()
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Root.XamlRoot,
+                Title = L.T("hotkey.notEffective"),
+                Content = new TextBlock
+                {
+                    Text = L.F("hotkey.startupWarn", _hotkeyStatus),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                CloseButtonText = L.T("common.close"),
+            };
+            await dialog.ShowAsync();
+        }
+        catch
+        {
+            // 弹不出来(无 XamlRoot 等):静默,不崩主流程
+        }
     }
 
     /// <summary>

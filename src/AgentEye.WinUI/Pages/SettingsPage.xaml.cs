@@ -42,6 +42,7 @@ public sealed partial class SettingsPage : UserControl
     private Dictionary<string, object?>? _editing; // 非 null = 编辑模式
     private bool _loading;                          // 回显期间不触发保存
     private bool _testing;                          // 「测试」进行中,防重入
+    private bool _hotkeyWarned;                     // 当前失败状态已弹过窗(不重复弹)
     private CancellationTokenSource? _sizeDebounce;
 
     private readonly List<ThemeOption> _themeOptions =
@@ -166,11 +167,16 @@ public sealed partial class SettingsPage : UserControl
         ShowListPane();
         LoadGeneral();
         ReloadList();
-        // 热键当前注册失败(组合被别的程序占用)时提示一次;
-        // 启动阶段不弹——增强面静默降级,别在开机时打扰用户
-        var status = _main.HotkeyStatus;
-        if (status.StartsWith(L.T("hotkey.regFailPrefix"), StringComparison.Ordinal))
-            _ = ShowErrorAsync(L.T("hotkey.notEffective"), status);
+        // 热键没生效(被占用/组合非法/服务异常)时提示一次;
+        // 同一个失败状态只弹一次,恢复了下次再犯才再弹
+        if (_main.HotkeyOk)
+        {
+            _hotkeyWarned = false;
+            return;
+        }
+        if (_hotkeyWarned) return;
+        _hotkeyWarned = true;
+        _ = ShowErrorAsync(L.T("hotkey.notEffective"), _main.HotkeyStatus);
     }
 
     /// <summary>错误提示走弹窗(设置页不保留常驻状态小字)。</summary>
@@ -454,10 +460,15 @@ public sealed partial class SettingsPage : UserControl
         _app.TrySaveCfg();
         _main.ApplyHotkey();
         HotkeyBox.Text = _app.HotkeyText;
-        // 注册失败(被别的程序占用)才提示;成功静默,界面不留状态小字
-        var status = _main.HotkeyStatus;
-        if (status.StartsWith(L.T("hotkey.regFailPrefix"), StringComparison.Ordinal))
-            _ = ShowErrorAsync(L.T("hotkey.notEffective"), status);
+        // 失败一律走弹窗(被占用/组合非法/服务异常都算,不再只认"注册失败"开头);
+        // 成功静默,界面不留状态小字
+        if (_main.HotkeyOk)
+        {
+            _hotkeyWarned = false;
+            return;
+        }
+        _hotkeyWarned = true;
+        _ = ShowErrorAsync(L.T("hotkey.notEffective"), _main.HotkeyStatus);
     }
 
     private void BtnClearHotkey_Click(object sender, RoutedEventArgs e)

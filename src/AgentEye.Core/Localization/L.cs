@@ -154,7 +154,6 @@ public static class L
         // —— 热键状态(设置页回显/弹窗) ——
         ["hotkey.svcDown"] = "热键服务不可用",
         ["hotkey.applyFailed"] = "热键设置失败",
-        ["hotkey.regFailPrefix"] = "注册失败",
         ["hotkey.notEffective"] = "快捷键未生效",
         ["hotkey.invalidCombo"] = "组合无效",
         ["hotkey.invalidDefault"] = "请按字母/数字/功能键",
@@ -165,9 +164,10 @@ public static class L
         ["hotkey.stTimeout"] = "热键设置超时",
         ["hotkey.stOff"] = "已关闭",
         ["hotkey.stInvalid"] = "组合无效:{0}",
-        ["hotkey.stInUse"] = "注册失败(该组合已被其它程序占用)",
+        ["hotkey.stInUse"] = "注册失败(该组合已被其它程序占用,可换个组合)",
         ["hotkey.stRegError"] = "注册失败(错误 {0})",
         ["hotkey.stActive"] = "已生效:{0}",
+        ["hotkey.startupWarn"] = "{0}。可在设置页更换组合。",
 
         // —— 告警通知 ——
         ["notify.titleOne"] = "{0} 额度告警",
@@ -492,7 +492,6 @@ public static class L
         // —— hotkey status (settings echo / dialog) ——
         ["hotkey.svcDown"] = "Hotkey service unavailable",
         ["hotkey.applyFailed"] = "Failed to apply hotkey",
-        ["hotkey.regFailPrefix"] = "Registration failed",
         ["hotkey.notEffective"] = "Hotkey not active",
         ["hotkey.invalidCombo"] = "Invalid shortcut",
         ["hotkey.invalidDefault"] = "Press a letter, number or function key",
@@ -503,9 +502,10 @@ public static class L
         ["hotkey.stTimeout"] = "Hotkey apply timed out",
         ["hotkey.stOff"] = "Off",
         ["hotkey.stInvalid"] = "Invalid shortcut: {0}",
-        ["hotkey.stInUse"] = "Registration failed (shortcut already in use by another app)",
+        ["hotkey.stInUse"] = "Registration failed (shortcut already in use by another app — pick another one)",
         ["hotkey.stRegError"] = "Registration failed (error {0})",
         ["hotkey.stActive"] = "Active: {0}",
+        ["hotkey.startupWarn"] = "{0}. You can change the shortcut in Settings.",
 
         // —— alert toast ——
         ["notify.titleOne"] = "{0} balance alert",

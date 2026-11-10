@@ -222,6 +222,21 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   直接拒绝。
 - 组合被别的程序占用(1409)只落 `HotkeyService.Status` 文案,设置页**弹窗**提示,
   应用照常运行——不许因此崩主流程(增强面契约)。
+- **失败判定看状态枚举,不看文案前缀**(`HotkeyService.State` /
+  `HotkeyState`):`Invalid` / `InUse` / `RegError` / `ServiceDown` /
+  `NoResponse` / `Timeout` / `ApplyFailed` 都算失败,一律走弹窗,成功静默。
+  **`Unknown` 不算失败**:热键服务是在 `Root_Loaded` 里后建的,页面初始化
+  早于它,那时 `_hotkey` 还是 null——1.5.3 首版把 null 当成"服务不可用",
+  结果每次启动都误弹「快捷键未生效」(已修:null/未装配 = Unknown = 无错)。
+  旧的 `hotkey.regFailPrefix` 文案前缀判定已删(只覆盖了「注册失败」一种,
+  服务异常全静默)。
+- `RegisterHotKey` 的 P/Invoke **必须带 `SetLastError=true`**:不带的话
+  `Marshal.GetLastWin32Error()` 拿到的是 CLR 内部垃圾值(实测 -130988),
+  1409「组合被占用」这条友好文案永远走不到,用户看到的是「注册失败(错误
+  -130988)」这种怪码(1.5.3 修)。
+- 弹窗时机:设置页每次切到时弹一次(**同一失败状态只弹一次**,恢复后下次
+  再犯才再弹);启动时热键就没生效也弹一次(`MainWindow.ShowHotkeyWarningAsync`),
+  但**开机自启的静默启动(`--minimized`)不弹**——别在开机时打扰用户。
 - 设置页「录制」:文本框既可手打(解析器大小写不敏感),也可**直接按组合键**
   录入——但只有"输入框内容仍是已保存的值"时按键才算录入,用户一旦手动改字
   就交回输入框(否则打 "+" 会被误判成组合)。**WinUI 的 `KeyRoutedEventArgs`
@@ -236,6 +251,28 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   `MainWindow.CloseAllowedByUpdate` 放行 Restart Manager)、开关关掉后的 X。
   热键不给前台权,`SetForegroundWindow` 被拒时借前台线程
   (`AttachThreadInput`)再试。
+
+## 单实例契约(1.5.3 起)
+
+- 热键、托盘图标、小组件、轮询都是**进程级**的:第二个实例会去抢第一个的
+  全局热键(1409「该组合已被其它程序占用」),还会多出一份托盘/小组件/轮询。
+  所以**必须单实例**。
+- 机制在 `Services/SingleInstance.cs`(自建 Win32):命名互斥体
+  `Local\AgentEye.Singleton`(Local\ = 当前登录会话,跨用户不互斥)+
+  主实例的**隐藏**顶层窗口(类名前缀 `AgentEyeSingleton_`,从不 ShowWindow,
+  但 `EnumWindows` 能枚举到)。第二实例枚举窗口认出主实例 → 发
+  `WM_APP_ACTIVATE` → 自己退出。
+- **不用 WinAppSDK 的 `AppInstance.FindOrRegisterForKey`**:本项目是
+  unpackaged(`WindowsPackageType=None`),`RedirectActivationToAsync` 的
+  `Activated` 回调可靠性要实测;自建可控,也跟托盘/热键同一路子。
+- 第二实例必须在**建 MainWindow 之前**退出(`App.OnLaunched` 最前面判):
+  托盘/小组件/热键/轮询/配置写入一个都不碰。退出用 `Environment.Exit(0)`
+  (没建窗口,直接退干净)。
+- 静默启动(开机自启 `--minimized`)撞上已有实例 → 只让主实例保住托盘,
+  **不弹面板**(开机弹窗是打扰);普通启动 → 把面板叫到前台
+  (`MainWindow.ActivateFromSecondInstance` → `WakeUp()`)。
+- 互斥体/隐藏窗口建不起来 → 静默降级成多实例照常跑(增强面契约),
+  不许起不来。找不到主实例窗口时第二实例静默退出(宁可少开,也不双开)。
 
 ## 增强面降级
 
