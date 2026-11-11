@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.WinUI.Services;
 
@@ -21,7 +22,11 @@ public sealed class TrayIconService : IDisposable
     private const int NIN_CONTEXTMENU = 0x0400 + 5;
     private const uint WM_CONTEXTMENU = 0x007B;  // version 4 的右键事件
 
-    [StructLayout(LayoutKind.Sequential, Pack = 2, CharSet = CharSet.Unicode)]
+    // ⚠ 不许 Pack=2:x64 下 8 字节的 hWnd/hIcon 会被压到 4 字节对齐(hWnd@4),
+    // 与原生 NOTIFYICONDATAW(x64 hWnd@8 / hIcon@32)错位 → NIM_ADD 必然失败,
+    // 且失败被增强面吞掉 → 托盘永远无图标、无任何报错(实测踩坑,Default pack
+    // 实测 Size=952 / hWnd@8 / hIcon@32,与原生 x64 布局逐字段吻合)。
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NOTIFYICONDATAW
     {
         public int cbSize;
@@ -86,6 +91,10 @@ public sealed class TrayIconService : IDisposable
     private static extern bool SetForegroundWindow(nint hWnd);
     [DllImport("user32.dll")]
     private static extern bool PostMessageW(nint hWnd, uint msg, nint wp, nint lp);
+    [DllImport("user32.dll")]
+    private static extern bool PostThreadMessageW(uint threadId, uint msg, nint wp, nint lp);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint pid);
     [DllImport("user32.dll")]
     private static extern nint GetWindowLongPtrW(nint hWnd, int idx);
     [DllImport("user32.dll")]
@@ -184,6 +193,8 @@ public sealed class TrayIconService : IDisposable
                 TranslateMessage(ref msg);
                 DispatchMessageW(ref msg);
             }
+            // 循环退出(WM_QUIT)后在本线程销毁窗口:DestroyWindow 只能由创建窗口的线程调
+            DestroyWindow(_hwndValue);
         }
     }
 
@@ -219,11 +230,11 @@ public sealed class TrayIconService : IDisposable
     {
         var menu = CreatePopupMenu();
         if (menu == nint.Zero) return;
-        AppendMenuW(menu, MF_STRING, new nint(1), "打开主面板");
-        AppendMenuW(menu, MF_STRING, new nint(2), "切换小组件");
+        AppendMenuW(menu, MF_STRING, new nint(1), L.T("tray.open"));
+        AppendMenuW(menu, MF_STRING, new nint(2), L.T("tray.widget"));
         AppendMenuW(menu, MF_SEPARATOR, nint.Zero, null);
-        AppendMenuW(menu, MF_STRING, new nint(3), "设置");
-        AppendMenuW(menu, MF_STRING, new nint(4), "退出");
+        AppendMenuW(menu, MF_STRING, new nint(3), L.T("tray.settings"));
+        AppendMenuW(menu, MF_STRING, new nint(4), L.T("tray.exit"));
         GetCursorPos(out var pt);
         // TrackPopupMenu 前必须 SetForegroundWindow,否则菜单点外部不消失(经典坑)
         SetForegroundWindow(hWnd);
@@ -236,7 +247,7 @@ public sealed class TrayIconService : IDisposable
             case 1: try { _main.RestoreFromTray(); } catch { } break;
             case 2: try { _main.ToggleWidget(); } catch { } break;
             case 3: try { _main.RestoreFromTray(); _main.GoSettings(); } catch { } break;
-            case 4: try { _main.Close(); } catch { } break;
+            case 4: try { _main.ExitFromTray(); } catch { } break;
         }
     }
 
@@ -272,14 +283,31 @@ public sealed class TrayIconService : IDisposable
                 Levels.Unconfigured => 3, Levels.Paused => 4, _ => 5,
             }).First();
         if (worst is null)
-            return ("··", "empty", "AgentEye — 没有已接入的 provider");
+            return ("··", "empty", L.T("tray.tooltipEmpty"));
         if (worst.Level is Levels.Unconfigured or Levels.Error or Levels.Paused)
-            return ("!", $"{worst.Name}|{worst.Level}", $"AgentEye — {worst.Name}({worst.Level})");
-        var used = worst.Pct is null ? 0 : (int)Math.Round(100 - worst.Pct.Value);
+            return ("!", $"{worst.Name}|{worst.Level}",
+                L.F("tray.tooltipLevel", worst.Name, LevelText(worst.Level)));
+        // 没有 pct 的金额行($ 剩余):画 neutral 点串,tooltip 给等级名,
+        // 别硬凑「已用 0%」误导
+        if (worst.Pct is null)
+            return ("··", $"{worst.Name}|np",
+                L.F("tray.tooltipLevel", worst.Name, LevelText(worst.Level)));
+        var used = (int)Math.Round(100 - worst.Pct.Value);
         used = Math.Clamp(used, 0, 100);
         return (used.ToString(), $"{worst.Name}|{used}",
-            $"AgentEye — {worst.Name} 已用 {used}%");
+            L.F("tray.tooltipWorst", worst.Name, used));
     }
+
+    /// <summary>等级 → 本地化短名(tooltip 用;错误行不该露出英文内部枚举名)。</summary>
+    private static string LevelText(string level) => level switch
+    {
+        Levels.Ok => L.T("ov.level.ok"),
+        Levels.Warn => L.T("ov.level.warn"),
+        Levels.Critical => L.T("ov.level.critical"),
+        Levels.Unconfigured => L.T("ov.unconfigured"),
+        Levels.Paused => L.T("ov.paused"),
+        _ => L.T("ov.error"),
+    };
 
     /// <summary>托盘图标:应用 A 标 + 数字牌(渲染细节见 TrayIconRenderer)。</summary>
     private nint Draw(string digits)
@@ -338,8 +366,19 @@ public sealed class TrayIconService : IDisposable
         RemoveIcon();
         if (_icon != nint.Zero) { try { DestroyIcon(_icon); } catch { } }
         _quit = true;
-        if (_hwnd != nint.Zero) { try { PostMessageW(_hwnd, 0x0010, nint.Zero, nint.Zero); } catch { } } // WM_CLOSE
+        // WM_QUIT 直接投给线程队列:GetMessage 收到即返回 0,循环退出。
+        // 旧实现用 WM_CLOSE:只销毁窗口,循环仍阻塞在 GetMessage,Join 白等 1 秒。
+        if (_hwnd != nint.Zero)
+        {
+            try
+            {
+                var tid = GetWindowThreadProcessId(_hwnd, out _);
+                if (tid != 0) PostThreadMessageW(tid, 0x0012, nint.Zero, nint.Zero); // WM_QUIT
+            }
+            catch { /* 增强面 */ }
+        }
         try { _thread?.Join(1000); } catch { }
+        // 兜底:线程没退出(极端情况)时跨线程 DestroyWindow 会失败,无害
         if (_hwnd != nint.Zero) { try { DestroyWindow(_hwnd); } catch { } }
     }
 }

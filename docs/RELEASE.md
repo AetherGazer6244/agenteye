@@ -3,7 +3,7 @@
 应用的"检查更新"走 GitHub Releases。本文件规定发布时必须满足的格式,
 否则应用会提示"release 里没有 setup.exe 安装包"或拒绝安装。
 
-- 仓库:`github.com/Cecilian-Elysian/AgentEye`(公开,应用用匿名 API 读取)
+- 仓库:`github.com/AetherGazer6244/AgentEye`(公开,应用用匿名 API 读取)
 - 应用侧实现:`src/AgentEye.Core/Update/`(检查/下载/校验)与
   `src/AgentEye.WinUI/Services/UpdateService.cs`(编排/拉起安装器)
 - 一键构建:`build.ps1`(项目根)→ `dist\`(便携目录)+ `installer\AgentEye_Setup.exe`
@@ -55,8 +55,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
 
 安装器行为(见 `AgentEye_Setup.iss`):
 
-- `PrivilegesRequired=lowest`,默认装 `E:\AgentEye`,首装显示目录页、升级沿用旧目录
-- 桌面快捷方式(默认勾)、开机自启 HKCU Run(默认不勾)
+- `PrivilegesRequired=lowest`,默认装 `E:\AgentEye`;每次安装都显示目录页
+  (升级预填旧目录,可改),浏览对话框可「新建文件夹」
+- 桌面 / 开始菜单快捷方式均可选(默认勾,记住上次选择);开机自启 HKCU Run
+  默认不勾
 - `CloseApplications=yes` + `RestartApplications=yes`:升级时经 Restart Manager
   关掉运行中的应用,装完自动重启——**应用内静默更新靠的就是这一对**
 - 卸载入口:开始菜单 + 系统设置"应用"(HKCU Uninstall 注册表)

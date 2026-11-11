@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -11,11 +12,11 @@ public sealed record DetectOutcome(string Kind, string BaseUrl, string Confidenc
 /// </summary>
 public static partial class Detect
 {
-    private static readonly (string Prefix, string Kind, string DefaultUrl, string Confidence, string Note)[]
+    private static readonly (string Prefix, string Kind, string DefaultUrl, string Confidence, string NoteKey)[]
         KeyPrefixes =
         [
             ("sk-cp-", "minimax", "https://api.minimaxi.com", "high",
-             "key 以 'sk-cp-' 开头 → MiniMax Coding Plan"),
+             "det.minimaxCp"),
         ];
 
     // "ey" 开头的三段式 JWT:MiniMax 的 token_plan 普通 key 和 OpenCode Go
@@ -23,14 +24,17 @@ public static partial class Detect
     [GeneratedRegex(@"^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")]
     private static partial Regex JwtShape();
 
-    private static readonly (string Marker, string Kind, string DefaultUrl, string Note)[]
+    private static readonly (string Marker, string Kind, string DefaultUrl, string NoteKey)[]
         UrlHostHints =
         [
-            ("deepseek.com", "deepseek", "https://api.deepseek.com", "URL 含 'deepseek.com' → DeepSeek 官方"),
-            ("bigmodel.cn", "zhipu", "https://open.bigmodel.cn", "URL 含 'bigmodel.cn' → 智谱 GLM"),
-            ("minimaxi.com", "minimax", "https://api.minimaxi.com", "URL 含 'minimaxi.com' → MiniMax"),
-            ("minimax.cn", "minimax", "https://api.minimaxi.com", "URL 含 'minimax.cn' → MiniMax"),
-            ("opencode.ai", "opencode_go", "https://opencode.ai", "URL 含 'opencode.ai' → OpenCode Go"),
+            ("deepseek.com", "deepseek", "https://api.deepseek.com", "det.urlDeepseek"),
+            ("bigmodel.cn", "zhipu", "https://open.bigmodel.cn", "det.urlZhipu"),
+            ("minimaxi.com", "minimax", "https://api.minimaxi.com", "det.urlMinimax"),
+            ("minimax.cn", "minimax", "https://api.minimaxi.com", "det.urlMinimaxCn"),
+            ("opencode.ai", "opencode_go", "https://opencode.ai", "det.urlOc"),
+            // 1.6.0 新增
+            ("siliconflow", "siliconflow", "https://api.siliconflow.cn", "det.urlSiliconflow"),
+            ("openrouter.ai", "openrouter", "https://openrouter.ai", "det.urlOpenrouter"),
         ];
 
     public static DetectOutcome Run(string key = "", string hintUrl = "")
@@ -41,26 +45,26 @@ public static partial class Detect
         if (hintUrl.Length > 0)
         {
             var host = Regex.Replace(hintUrl, @"^https?://", "").ToLowerInvariant();
-            foreach (var (marker, kind, defaultUrl, note) in UrlHostHints)
+            foreach (var (marker, kind, defaultUrl, noteKey) in UrlHostHints)
             {
                 if (host.Contains(marker, StringComparison.Ordinal))
-                    return new DetectOutcome(kind, defaultUrl, "high", note);
+                    return new DetectOutcome(kind, defaultUrl, "high", L.T(noteKey));
             }
             if (hintUrl.EndsWith("/v1", StringComparison.Ordinal))
                 return new DetectOutcome("generic_openai", hintUrl, "medium",
-                    "URL 含 '/v1' → 通用 OpenAI 兼容");
+                    L.T("det.urlV1"));
             return new DetectOutcome("generic_openai", hintUrl, "low",
-                "未识别 URL,按通用 OpenAI 兼容处理");
+                L.T("det.fallbackGeneric"));
         }
 
         if (key.Length == 0)
             return new DetectOutcome("generic_openai", "", "low",
-                "未提供 key 与 URL,需要更多信息");
+                L.T("det.needMore"));
 
-        foreach (var (prefix, kind, defaultUrl, confidence, note) in KeyPrefixes)
+        foreach (var (prefix, kind, defaultUrl, confidence, noteKey) in KeyPrefixes)
         {
             if (key.StartsWith(prefix, StringComparison.Ordinal))
-                return new DetectOutcome(kind, defaultUrl, confidence, note);
+                return new DetectOutcome(kind, defaultUrl, confidence, L.T(noteKey));
         }
 
         if (JwtShape().IsMatch(key))
@@ -68,15 +72,14 @@ public static partial class Detect
             // 两种 JWT 分不出谁是谁:给 opencode_go 默认 URL 但置信度降为
             // low,让用户核对。
             return new DetectOutcome("opencode_go", "https://opencode.ai", "low",
-                "key 是 JWT 形态,可能是 OpenCode Go,也可能是 MiniMax 的 token_plan key;" +
-                "填 URL 提示可纠正,新增后请核对");
+                L.T("det.jwtAmbiguous"));
         }
 
         if (key.StartsWith("sk-", StringComparison.Ordinal))
             return new DetectOutcome("generic_openai", "", "low",
-                "key 以 'sk-' 开头,疑似 OpenAI 兼容,需要 base_url");
+                L.T("det.skNeedsUrl"));
 
         return new DetectOutcome("generic_openai", "", "low",
-            $"无法识别 key 形态 (长度 {key.Length}),按通用处理,请提供 base_url");
+            L.F("det.unknownKeyShape", key.Length));
     }
 }

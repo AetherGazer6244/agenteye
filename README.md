@@ -3,14 +3,16 @@
 Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 紧凑面板 +
 托盘常驻 + 桌面小组件,盯着各平台 API 额度,快烧完时提前告警。
 
-![version](https://img.shields.io/badge/version-v1.2.3-blue)
+![version](https://img.shields.io/badge/version-v1.5.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B%20%2F%2011-blueviolet)
 ![runtime](https://img.shields.io/badge/runtime-.NET%208%20%2B%20WinAppSDK%201.7-5C2D91)
 
 <p align="center">
-  <img src="docs/screenshots/main.png" width="380" alt="主面板(总览页)" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/screenshots/widget.png" width="260" alt="桌面小组件" />
+  <img src="docs/screenshots/main.png" width="280" alt="主面板(浅色)" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/main-dark.png" width="280" alt="主面板(深色)" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/widget.png" width="180" alt="桌面小组件" />
 </p>
 
 > 与 Python/Tkinter 原版(存于 `main` 与 `feat/glass-redesign` 分支历史)共用
@@ -60,11 +62,13 @@ Windows 桌面多 Key AI 额度观察工具(WinUI 3 重写版)。一个 Acrylic 
 
 ## 下载安装
 
-从 [Releases](https://github.com/Cecilian-Elysian/AgentEye/releases/latest)
+从 [Releases](https://github.com/AetherGazer6244/AgentEye/releases/latest)
 下载 `AgentEye_Setup.exe` 双击安装(Inno Setup,lzma2 压缩约 7.9 MB):
 
-- 按用户级安装(HKCU),**无需管理员**;默认装到 `E:\AgentEye`,全新安装可改目录
-- 可选桌面快捷方式与开机自启;开始菜单 / 系统设置「应用」自带卸载入口
+- 按用户级安装(HKCU),**无需管理员**;默认装到 `E:\AgentEye`,每次安装都
+  可改目录、可在浏览对话框里新建文件夹
+- 桌面 / 开始菜单快捷方式均可选(默认勾,升级记住上次选择);开机自启默认
+  不勾;不建开始菜单时卸载入口仍在系统设置「应用」
 - 升级时安装器经 Restart Manager 关闭运行中的应用,装完自动重启新版
 - 配置与缓存都在 `~\.agenteye\`,与安装位置无关,升级 / 重装不丢配置
 

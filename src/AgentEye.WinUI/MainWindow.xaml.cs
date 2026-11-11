@@ -1,3 +1,5 @@
+using AgentEye.Core.Localization;
+using AgentEye.Core.Providers;
 using AgentEye.WinUI.Pages;
 using AgentEye.WinUI.Services;
 using AgentEye.WinUI.Tray;
@@ -85,11 +87,23 @@ public sealed partial class MainWindow : Window
     private WidgetWindow? _widget;
     private HotkeyService? _hotkey;
     private string _hotkeyStatus = "";
+    private HotkeyState _hotkeyState = HotkeyState.Unknown;
     private bool _closed;
+    private bool _forceClose;    // 托盘"退出"/更新重启置位:绕过关窗进托盘拦截
+
+    /// <summary>
+    /// 更新流程放行:安装器拉起后 Restart Manager 要关闭本应用,
+    /// 关窗拦截必须让路,否则静默升级被卡死(安装器契约 CloseApplications=yes)。
+    /// </summary>
+    internal static volatile bool CloseAllowedByUpdate;
 
     public MainWindow()
     {
+        // 语言定型已在 App ctor(资源系统初始化前)完成,这里直接进 UI 装配
         InitializeComponent();
+        // 头部按钮 tooltip(语言启动定型,重启生效)
+        ToolTipService.SetToolTip(BtnBack, L.T("win.backTooltip"));
+        ToolTipService.SetToolTip(BtnSettings, L.T("win.settingsTooltip"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
@@ -106,6 +120,10 @@ public sealed partial class MainWindow : Window
         RestoreGeometry();
 
         Closed += (_, _) => OnClosed();
+        // 关主窗 X:ui.close_to_tray(默认开)→ 隐藏进托盘,进程/托盘/轮询都还在;
+        // 关闭开关(或托盘"退出"/更新安装)才真退出
+        try { AppWindow.Closing += OnAppWindowClosing; }
+        catch { /* 老系统 AppWindow.Closing 不可用:退回旧行为(关闭即退出) */ }
     }
 
     /// <summary>把 A 标图标挂到窗口上;失败静默(增强面)。</summary>
@@ -140,6 +158,15 @@ public sealed partial class MainWindow : Window
         PageHost.Children.Add(_settings);
         ShowPage("overview");
 
+        // 主题在 ctor 里设过一次,但 Root 那时还没走完首次布局,
+        // 部分场景(先建页再改主题的时序)会渲染回退;树加载后再应用一次,
+        // 保证 dark/light 配置启动即生效(实测 B/C 两轮构建复现过浅色残留)。
+        ApplyTheme(_app.ThemeChoice);
+
+        // 头部状态胶囊:随刷新更新(ResultsChanged 约定在 UI 线程触发)
+        _app.ResultsChanged += UpdateStatusPill;
+        UpdateStatusPill();
+
         _app.Poller.Start();
 
         // 空配置首启也刷一轮:让"未配置"空态立刻可见
@@ -160,17 +187,45 @@ public sealed partial class MainWindow : Window
         }
         catch { /* 增强面,失败静默 */ }
 
+        // 开机自启自愈 + 镜像同步:注册表指向的 exe 路径与当前不一致(挪目录/换盘)
+        // 时重写;镜像值以注册表为准回填,修掉历史遗留的分叉。失败静默(增强面)。
+        try
+        {
+            StartupService.EnsureCurrent();
+            var regOn = StartupService.IsEnabled();
+            if (_app.Autostart != regOn)
+            {
+                _app.SetAutostart(regOn);
+                _app.TrySaveCfg();
+            }
+        }
+        catch { /* 增强面 */ }
+
         // 全局快捷键(唤醒/隐藏主面板);失败静默降级(不把主流程带崩)
         try
         {
             _hotkey = new HotkeyService(TogglePanel);
             ApplyHotkey();
         }
-        catch { _hotkey = null; _hotkeyStatus = "热键服务不可用"; }
+        catch
+        {
+            _hotkey = null;
+            _hotkeyStatus = L.T("hotkey.svcDown");
+            _hotkeyState = HotkeyState.ServiceDown;
+        }
+
+        // 热键没生效(被占用/组合非法/服务异常):正常启动时弹一次告知,
+        // 开机自启的静默启动不打扰(避免开机弹窗)
+        if (!HotkeyOk && !StartupService.HasMinimizedFlag())
+            DispatcherQueue.TryEnqueue(() => _ = ShowHotkeyWarningAsync());
 
         // 主题跟随系统:auto 时系统切换会触发这里,同步按钮配色即可,
         // 页面/小组件各自监听 ActualThemeChanged 重渲染
-        Root.ActualThemeChanged += (_, _) => SyncCaptionButtons();
+        Root.ActualThemeChanged += (_, _) =>
+        {
+            SyncCaptionButtons();
+            UpdateStatusPill();   // 点色是代码取的画刷,主题切换后要重取
+        };
 
         // 标题栏右侧留白 = 物理像素换算 DIP,别硬编码
         try
@@ -237,8 +292,51 @@ public sealed partial class MainWindow : Window
         _settings.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
         _settings.OnShown();
         BtnBack.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
-        AppTitle.Text = tag == "overview" ? "AgentEye" : "AgentEye — 设置";
+        AppTitle.Text = tag == "overview" ? "AgentEye" : L.T("win.titleSettings");
     }
+
+    // ---------------- 头部状态胶囊 ----------------
+
+    /// <summary>
+    /// 头部胶囊:最紧张 provider 的等级色点 + provider 数。
+    /// ResultsChanged / 主题切换时重刷;窗口关闭后不再更新(_closed 兜底)。
+    /// </summary>
+    private void UpdateStatusPill()
+    {
+        if (_closed || StatusPill is null) return;
+        var rows = _app.Results;
+        if (rows.Count == 0)
+        {
+            StatusPill.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var worst = rows.OrderBy(SeverityOf).First().Level;
+        try
+        {
+            StatusDot.Fill = AeRes.Brush(Root, worst switch
+            {
+                Levels.Critical => "AeCriticalBrush",
+                Levels.Error => "AeErrorBrush",
+                Levels.Warn => "AeWarnBrush",
+                Levels.Ok => "AeOkBrush",
+                _ => "AePausedBrush",
+            });
+        }
+        catch { /* 主题资源未就绪等:胶囊仍显示文案 */ }
+        StatusPillText.Text = L.F("ov.count", rows.Count);
+        StatusPill.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>等级严重度排序:紧张 &gt; 异常 &gt; 注意 &gt; 未配置 &gt; 暂停 &gt; 正常(小 = 严重)。</summary>
+    private static int SeverityOf(ProviderResult r) => r.Level switch
+    {
+        Levels.Critical => 0,
+        Levels.Error => 1,
+        Levels.Warn => 2,
+        Levels.Unconfigured => 3,
+        Levels.Paused => 4,
+        _ => 5,
+    };
 
     // ---------------- 头部图标按钮 ----------------
 
@@ -280,6 +378,28 @@ public sealed partial class MainWindow : Window
     /// <summary>当前热键状态文案(设置页回显;失败原因也在这里)。</summary>
     public string HotkeyStatus => _hotkeyStatus;
 
+    /// <summary>当前热键注册状态(设置页按状态判定要不要弹窗)。</summary>
+    public HotkeyState HotkeyState => _hotkeyState;
+
+    /// <summary>
+    /// 热键是否处在"没有毛病"的状态:已生效 / 用户主动关掉 / **还没装配**
+    /// (Unknown)。Unknown 必须算正常——热键服务是在 Root_Loaded 里后建的,
+    /// 页面初始化早于它,那时不能当成"服务不可用"(否则每次启动都误弹
+    /// 「快捷键未生效」)。
+    /// </summary>
+    public bool HotkeyOk => _hotkeyState is HotkeyState.Unknown
+        or HotkeyState.Active or HotkeyState.Disabled;
+
+    /// <summary>
+    /// 第二实例启动时的响应:把主面板叫到前台(静默启动 --minimized 时只保托盘,
+    /// 不弹面板,免得开机弹窗打扰)。
+    /// </summary>
+    public void ActivateFromSecondInstance(bool showPanel)
+    {
+        if (!showPanel) return;
+        WakeUp();
+    }
+
     /// <summary>按当前配置重注册全局热键(设置页改键后立即调用)。</summary>
     public void ApplyHotkey()
     {
@@ -287,13 +407,45 @@ public sealed partial class MainWindow : Window
         {
             if (_hotkey is null)
             {
-                _hotkeyStatus = "热键服务不可用";
+                _hotkeyStatus = L.T("hotkey.svcDown");
+                _hotkeyState = HotkeyState.ServiceDown;
                 return;
             }
             _hotkey.Apply(_app.HotkeyText, _app.HotkeyUsable);
             _hotkeyStatus = _hotkey.Status;
+            _hotkeyState = _hotkey.State;
         }
-        catch { _hotkeyStatus = "热键设置失败"; }
+        catch
+        {
+            _hotkeyStatus = L.T("hotkey.applyFailed");
+            _hotkeyState = HotkeyState.ApplyFailed;
+        }
+    }
+
+    /// <summary>
+    /// 热键注册失败的提示弹窗(启动时弹一次)。成功静默——设置页不搞常驻状态小字。
+    /// </summary>
+    private async Task ShowHotkeyWarningAsync()
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Root.XamlRoot,
+                Title = L.T("hotkey.notEffective"),
+                Content = new TextBlock
+                {
+                    Text = L.F("hotkey.startupWarn", _hotkeyStatus),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                CloseButtonText = L.T("common.close"),
+            };
+            await dialog.ShowAsync();
+        }
+        catch
+        {
+            // 弹不出来(无 XamlRoot 等):静默,不崩主流程
+        }
     }
 
     /// <summary>
@@ -341,6 +493,64 @@ public sealed partial class MainWindow : Window
     {
         try { AppWindow.Hide(); }
         catch { /* 增强面 */ }
+    }
+
+    /// <summary>
+    /// 关主窗 X 的拦截:close_to_tray 开(默认)时取消关闭、藏进托盘。
+    /// 真退出的三条路不受影响:托盘菜单"退出"、更新安装(Restart Manager)、
+    /// 关闭开关关掉后的旧行为。
+    /// </summary>
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_forceClose || _closed || CloseAllowedByUpdate) return; // 真:退出
+        if (!_app.CloseToTray) return;                              // 用户选了直接退出
+        try
+        {
+            args.Cancel = true;
+            SaveGeometry();   // 平时不再有"关窗"时机,隐藏前顺手把几何落盘
+            HidePanel();
+        }
+        catch { /* 增强面:隐藏失败就退回系统默认(窗口关闭退出) */ }
+    }
+
+    /// <summary>几何持久化(AppWindow 物理像素直接存,恢复时同源)。</summary>
+    private void SaveGeometry()
+    {
+        try
+        {
+            var ui = _app.UiDict();
+            ui["x"] = (double)AppWindow.Position.X;
+            ui["y"] = (double)AppWindow.Position.Y;
+            ui["width"] = (double)AppWindow.Size.Width;
+            ui["height"] = (double)AppWindow.Size.Height;
+            _app.TrySaveCfg();
+        }
+        catch { /* 关窗路径绝不因写盘失败崩溃 */ }
+    }
+
+    /// <summary>
+    /// 真退出(托盘菜单"退出"/更新重启):绕过关窗进托盘拦截,走完整清理。
+    /// 托盘菜单在 tray 线程上调本方法,而 Window.Close 只能在 UI 线程调——
+    /// 跨线程调用抛 RPC_E_WRONG_THREAD 且被 ShowMenu 的 catch 吞掉,表现就是
+    /// "托盘退出点了没反应"(1.4.1 实测踩坑);且 _forceClose 已置位不回滚,
+    /// 下一次点 X 会被误放行。所以统一封送 UI 线程执行,失败回滚 _forceClose。
+    /// </summary>
+    public void ExitFromTray()
+    {
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            ExitCore();
+            return;
+        }
+        DispatcherQueue.TryEnqueue(() => ExitCore());
+    }
+
+    private void ExitCore()
+    {
+        if (_closed) return;
+        _forceClose = true;
+        try { Close(); }
+        catch { _forceClose = false; }
     }
 
     /// <summary>高级设置:立即改主窗口尺寸并落盘(物理像素)。</summary>
@@ -442,16 +652,7 @@ public sealed partial class MainWindow : Window
         }
         catch { /* 静默 */ }
         // 几何持久化(AppWindow 物理像素直接存,恢复时同源)
-        try
-        {
-            var ui = _app.UiDict();
-            ui["x"] = (double)AppWindow.Position.X;
-            ui["y"] = (double)AppWindow.Position.Y;
-            ui["width"] = (double)AppWindow.Size.Width;
-            ui["height"] = (double)AppWindow.Size.Height;
-            _app.TrySaveCfg();
-        }
-        catch { /* 关窗路径绝不因写盘失败崩溃 */ }
+        SaveGeometry();
         _widget?.Dispose();
         _tray?.Dispose();
         _hotkey?.Dispose();

@@ -1,14 +1,14 @@
-<UserControl
+﻿<UserControl
     x:Class="AgentEye.WinUI.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls">
 
     <ScrollViewer Padding="20,4,20,20" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="6" MaxWidth="560" HorizontalAlignment="Left">
+        <StackPanel Spacing="8" MaxWidth="560" HorizontalAlignment="Left">
 
             <!-- 外观 -->
-            <TextBlock Text="外观" Style="{StaticResource AeSectionHeaderStyle}" />
+            <TextBlock x:Name="SecAppearance" Style="{StaticResource AeSectionHeaderStyle}" />
 
             <!-- 外观模式 -->
             <Border Style="{StaticResource AeSettingsItemStyle}">
@@ -18,14 +18,16 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE790;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE790;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="外观模式" Style="{StaticResource AeSettingsItemTitleStyle}" />
-                        <TextBlock Text="更改软件的深浅色模式"
+                        <TextBlock x:Name="TxtThemeTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtThemeSub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
-                    <ComboBox x:Name="ThemeCombo" Grid.Column="2" MinWidth="120"
+                    <ComboBox x:Name="ThemeCombo" Grid.Column="2" MinWidth="128"
                               DisplayMemberPath="Text"
                               VerticalAlignment="Center"
                               SelectionChanged="ThemeCombo_SelectionChanged" />
@@ -40,17 +42,41 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE768;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE768;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="开机自启动" Style="{StaticResource AeSettingsItemTitleStyle}" />
-                        <TextBlock Text="开机自动在后台运行(静默进托盘,不弹主面板)"
+                        <TextBlock x:Name="TxtAutostartTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtAutostartSub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
                     <ToggleSwitch x:Name="AutostartSwitch" Grid.Column="2"
-                                  MinWidth="0" OnContent="已启用" OffContent="已关闭"
-                                  VerticalAlignment="Center"
+                                  MinWidth="0" VerticalAlignment="Center"
                                   Toggled="AutostartSwitch_Toggled" />
+                </Grid>
+            </Border>
+
+            <!-- 关窗行为:X = 隐藏进托盘(默认)/ 直接退出 -->
+            <Border Style="{StaticResource AeSettingsItemStyle}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE921;" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtCloseTrayTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtCloseTraySub"
+                                   Style="{StaticResource AeSettingsItemSubtitleStyle}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="CloseTraySwitch" Grid.Column="2"
+                                  MinWidth="0" VerticalAlignment="Center"
+                                  Toggled="CloseTraySwitch_Toggled" />
                 </Grid>
             </Border>
 
@@ -62,22 +88,51 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE774;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE774;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="语言" Style="{StaticResource AeSettingsItemTitleStyle}" />
-                        <TextBlock Text="界面语言(中英双语自 1.3.0 起可切换)"
+                        <TextBlock x:Name="TxtLangTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtLangSub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
-                    <ComboBox x:Name="LanguageCombo" Grid.Column="2" MinWidth="120"
+                    <ComboBox x:Name="LanguageCombo" Grid.Column="2" MinWidth="128"
                               DisplayMemberPath="Text"
                               VerticalAlignment="Center"
                               SelectionChanged="LanguageCombo_SelectionChanged" />
                 </Grid>
             </Border>
 
+            <!-- 网络 -->
+            <TextBlock x:Name="SecNetwork" Style="{StaticResource AeSectionHeaderStyle}" />
+
+            <!-- 代理模式:系统代理拒连时自动直连兜底(1.5.2) -->
+            <Border Style="{StaticResource AeSettingsItemStyle}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE702;" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtProxyTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtProxySub"
+                                   Style="{StaticResource AeSettingsItemSubtitleStyle}" />
+                    </StackPanel>
+                    <ComboBox x:Name="ProxyModeCombo" Grid.Column="2" MinWidth="128"
+                              DisplayMemberPath="Text"
+                              VerticalAlignment="Center"
+                              SelectionChanged="ProxyModeCombo_SelectionChanged" />
+                </Grid>
+            </Border>
+
             <!-- 快捷键 -->
-            <TextBlock Text="快捷键" Style="{StaticResource AeSectionHeaderStyle}" />
+            <TextBlock x:Name="SecHotkey" Style="{StaticResource AeSectionHeaderStyle}" />
 
             <Border Style="{StaticResource AeSettingsItemStyle}">
                 <Grid ColumnSpacing="12">
@@ -86,11 +141,13 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE765;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE765;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="唤醒快捷键" Style="{StaticResource AeSettingsItemTitleStyle}" />
-                        <TextBlock Text="设置全局唤醒和隐藏主面板的快捷键"
+                        <TextBlock x:Name="TxtHotkeyTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtHotkeySub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
@@ -99,13 +156,13 @@
                                  KeyDown="HotkeyBox_KeyDown"
                                  KeyUp="HotkeyBox_KeyUp"
                                  LostFocus="HotkeyBox_LostFocus" />
-                        <Button Content="清除" Click="BtnClearHotkey_Click" />
+                        <Button x:Name="BtnClearHotkey" Click="BtnClearHotkey_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
 
             <!-- 告警 -->
-            <TextBlock Text="告警" Style="{StaticResource AeSectionHeaderStyle}" />
+            <TextBlock x:Name="SecAlert" Style="{StaticResource AeSectionHeaderStyle}" />
 
             <Border Style="{StaticResource AeSettingsItemStyle}">
                 <StackPanel Spacing="10">
@@ -115,15 +172,16 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                                  Glyph="&#xE7BA;" />
+                        <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                            <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                      Glyph="&#xE7BA;" />
+                        </Border>
                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="告警" Style="{StaticResource AeSettingsItemTitleStyle}" />
-                            <TextBlock Text="额度低于阈值时弹系统通知"
+                            <TextBlock x:Name="TxtAlertTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                            <TextBlock x:Name="TxtAlertSub"
                                        Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                         </StackPanel>
                         <ToggleSwitch x:Name="AlertEnable" Grid.Column="2" MinWidth="0"
-                                      OnContent="告警开" OffContent="告警关"
                                       VerticalAlignment="Center"
                                       Toggled="AlertToggle_Changed" />
                     </Grid>
@@ -135,13 +193,13 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="剩余百分比 ≤"
+                            <TextBlock Grid.Column="0" x:Name="TxtWarnPct"
                                        VerticalAlignment="Center" TextWrapping="Wrap" />
                             <muxc:NumberBox x:Name="WarnPctBox" Grid.Column="1" MinWidth="90"
                                             Minimum="0" Maximum="100"
                                             SpinButtonPlacementMode="Compact"
                                             ValueChanged="AlertNum_Changed" />
-                            <TextBlock Grid.Column="2" Text="% 记为黄" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" x:Name="TxtWarnPctSuffix" VerticalAlignment="Center" />
                         </Grid>
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions>
@@ -149,19 +207,47 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="剩余额度 ≤"
+                            <TextBlock Grid.Column="0" x:Name="TxtCritAmount"
                                        VerticalAlignment="Center" TextWrapping="Wrap" />
                             <muxc:NumberBox x:Name="CriticalYuanBox" Grid.Column="1" MinWidth="90"
                                             Minimum="0" SpinButtonPlacementMode="Compact"
                                             ValueChanged="AlertNum_Changed" />
-                            <TextBlock Grid.Column="2" Text="元 记为红" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" x:Name="TxtCritSuffix" VerticalAlignment="Center" />
                         </Grid>
+                        <!-- 免打扰时段(1.6.0):开关 + 起止时间,alert 关时随阈值一起收纳 -->
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtQuietTitle"
+                                           Style="{StaticResource AeSettingsItemTitleStyle}" />
+                                <TextBlock x:Name="TxtQuietSub"
+                                           Style="{StaticResource AeSettingsItemSubtitleStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="QuietSwitch" Grid.Column="1" MinWidth="0"
+                                          VerticalAlignment="Center"
+                                          Toggled="QuietSwitch_Toggled" />
+                        </Grid>
+                        <StackPanel x:Name="QuietTimes" Orientation="Horizontal" Spacing="8"
+                                    Visibility="Collapsed">
+                            <TextBlock x:Name="TxtQuietStart" VerticalAlignment="Center" />
+                            <TimePicker x:Name="QuietStartPicker" ClockIdentifier="24HourClock"
+                                        MinuteIncrement="30" MinWidth="110"
+                                        SelectedTimeChanged="QuietTime_Changed" />
+                            <TextBlock x:Name="TxtQuietEnd" VerticalAlignment="Center" />
+                            <TimePicker x:Name="QuietEndPicker" ClockIdentifier="24HourClock"
+                                        MinuteIncrement="30" MinWidth="110"
+                                        SelectedTimeChanged="QuietTime_Changed" />
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- API 管理 -->
-            <TextBlock Text="API 管理" Style="{StaticResource AeSectionHeaderStyle}" />
+            <TextBlock x:Name="SecApi" Style="{StaticResource AeSectionHeaderStyle}" />
 
             <Border Style="{StaticResource AeSettingsItemStyle}">
                 <StackPanel x:Name="ManageRoot" Spacing="10">
@@ -170,10 +256,10 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="已接入的 Key"
+                        <TextBlock Grid.Column="0" x:Name="TxtKeysLabel"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}"
                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <Button Grid.Column="1" Content="添加 Key"
+                        <Button Grid.Column="1" x:Name="BtnAddKey"
                                 Click="BtnAdd_Click" />
                     </Grid>
 
@@ -183,12 +269,12 @@
                                   SelectionMode="Single"
                                   DoubleTapped="ProviderList_DoubleTapped" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="编辑" Click="BtnEdit_Click" />
-                            <Button Content="删除" Click="BtnDelete_Click" />
+                            <Button x:Name="BtnEdit" Click="BtnEdit_Click" />
+                            <Button x:Name="BtnDelete" Click="BtnDelete_Click" />
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- 表单态:只保留 url / key / model,其余走 config 文件 -->
+                    <!-- 表单态:类型 / url / key / model,其余走 config 文件 -->
                     <StackPanel x:Name="FormPane" Spacing="10"
                                 Visibility="Collapsed">
                         <Grid ColumnSpacing="10" RowSpacing="8">
@@ -201,31 +287,43 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="Base URL" VerticalAlignment="Center" />
-                            <TextBox x:Name="FBaseUrl" Grid.Column="1"
-                                     PlaceholderText="https://api.example.com" />
-                            <TextBlock Text="API Key" Grid.Row="1" VerticalAlignment="Center" />
-                            <TextBox x:Name="FKey" Grid.Row="1" Grid.Column="1"
-                                     PlaceholderText="粘贴 key;留空则沿用已存 key" />
-                            <TextBlock Text="Model" Grid.Row="2" VerticalAlignment="Center" />
-                            <TextBox x:Name="FModel" Grid.Row="2" Grid.Column="1"
-                                     PlaceholderText="如 deepseek-chat;额度端点不可用时用真实对话探测" />
+                            <TextBlock x:Name="TxtKindLabel" VerticalAlignment="Center" />
+                            <ComboBox x:Name="FKind" Grid.Column="1" MinWidth="128"
+                                      DisplayMemberPath="Text"
+                                      HorizontalAlignment="Left"
+                                      SelectionChanged="FKind_SelectionChanged" />
+                            <TextBlock Text="Base URL" Grid.Row="1" VerticalAlignment="Center" />
+                            <TextBox x:Name="FBaseUrl" Grid.Row="1" Grid.Column="1"
+                                     LostFocus="FBaseUrl_LostFocus" />
+                            <TextBlock Text="API Key" Grid.Row="2" VerticalAlignment="Center" />
+                            <TextBox x:Name="FKey" Grid.Row="2" Grid.Column="1"
+                                     LostFocus="FKey_LostFocus" />
+                            <TextBlock Text="Model" Grid.Row="3" VerticalAlignment="Center" />
+                            <ComboBox x:Name="FModel" Grid.Row="3" Grid.Column="1"
+                                      IsEditable="True"
+                                      SelectionChanged="FModel_SelectionChanged" />
                         </Grid>
+                        <TextBlock x:Name="FormDetect" Foreground="{StaticResource AeTextSecondaryBrush}"
+                                   Visibility="Collapsed" TextWrapping="Wrap" />
                         <TextBlock x:Name="FormError" Foreground="{StaticResource AeErrorBrush}"
                                    Visibility="Collapsed" TextWrapping="Wrap" />
+                        <TextBlock x:Name="FormResult" Foreground="{StaticResource AeTextSecondaryBrush}"
+                                   Visibility="Collapsed" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="BtnTest" Click="BtnTest_Click" />
                             <Button Style="{StaticResource AccentButtonStyle}"
-                                    Content="保存" Click="BtnSave_Click" />
-                            <Button Content="取消" Click="BtnCancel_Click" />
+                                    x:Name="BtnSave" Click="BtnSave_Click" />
+                            <Button x:Name="BtnCancel" Click="BtnCancel_Click" />
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- 高级 -->
-            <TextBlock Text="高级" Style="{StaticResource AeSectionHeaderStyle}" />
+            <TextBlock x:Name="SecAdv" Style="{StaticResource AeSectionHeaderStyle}" />
 
             <Border Style="{StaticResource AeSettingsItemStyle}">
                 <StackPanel Spacing="10">
@@ -235,12 +333,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                                  Glyph="&#xE90C;" />
+                        <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                            <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                      Glyph="&#xE90C;" />
+                        </Border>
                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="主窗口面板大小"
+                            <TextBlock x:Name="TxtSizeTitle"
                                        Style="{StaticResource AeSettingsItemTitleStyle}" />
-                            <TextBlock Text="主面板初始尺寸(320×400 ~ 800×1200 像素)"
+                            <TextBlock x:Name="TxtSizeSub"
                                        Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                         </StackPanel>
                     </Grid>
@@ -252,26 +352,51 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="宽" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="0" x:Name="TxtWidthLabel" VerticalAlignment="Center" />
                         <muxc:NumberBox x:Name="WidthBox" Grid.Column="1" MinWidth="90"
                                         Minimum="320" Maximum="800" SmallChange="10"
                                         SpinButtonPlacementMode="Compact"
                                         ValueChanged="SizeBox_Changed" />
                         <TextBlock Grid.Column="2" Text="px" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="3" Text="高" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="3" x:Name="TxtHeightLabel" VerticalAlignment="Center" />
                         <muxc:NumberBox x:Name="HeightBox" Grid.Column="4" MinWidth="90"
                                         Minimum="400" Maximum="1200" SmallChange="10"
                                         SpinButtonPlacementMode="Compact"
                                         ValueChanged="SizeBox_Changed" />
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="恢复默认 420×560" Click="BtnResetSize_Click" />
+                        <Button x:Name="BtnResetSize" Click="BtnResetSize_Click" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
+            <!-- 自适应轮询(1.6.0):紧张时加密/持续失败退避 -->
+            <Border Style="{StaticResource AeSettingsItemStyle}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE945;" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtAdaptiveTitle"
+                                   Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtAdaptiveSub"
+                                   Style="{StaticResource AeSettingsItemSubtitleStyle}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AdaptiveSwitch" Grid.Column="2"
+                                  MinWidth="0" VerticalAlignment="Center"
+                                  Toggled="AdaptiveSwitch_Toggled" />
+                </Grid>
+            </Border>
+
             <!-- 关于软件 -->
-            <TextBlock Text="关于软件" Style="{StaticResource AeSectionHeaderStyle}" />
+            <TextBlock x:Name="SecAbout" Style="{StaticResource AeSectionHeaderStyle}" />
 
             <Border Style="{StaticResource AeSettingsItemStyle}">
                 <Grid ColumnSpacing="12">
@@ -280,14 +405,16 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Grid.Column="0" Style="{StaticResource AeSettingsIconStyle}"
-                              Glyph="&#xE946;" />
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE946;" />
+                    </Border>
                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                        <TextBlock Text="关于软件" Style="{StaticResource AeSettingsItemTitleStyle}" />
-                        <TextBlock Text="查看软件信息、作者与项目详情"
+                        <TextBlock x:Name="TxtAboutTitle" Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtAboutSub"
                                    Style="{StaticResource AeSettingsItemSubtitleStyle}" />
                     </StackPanel>
-                    <Button Grid.Column="2" Content="查看详情"
+                    <Button Grid.Column="2" x:Name="BtnAboutDetails"
                             Click="BtnAboutDetails_Click" />
                 </Grid>
             </Border>
@@ -296,12 +423,9 @@
                 <TextBlock x:Name="VersionText" FontSize="12"
                            Foreground="{ThemeResource AeTextSecondaryBrush}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="BtnCheckUpdate" Content="检查更新"
-                            Click="BtnCheckUpdate_Click" />
-                    <Button x:Name="BtnDownloadUpdate" Content="下载并更新"
-                            Visibility="Collapsed" Click="BtnDownloadUpdate_Click" />
-                    <Button x:Name="BtnIgnoreUpdate" Content="忽略此版本"
-                            Visibility="Collapsed" Click="BtnIgnoreUpdate_Click" />
+                    <Button x:Name="BtnCheckUpdate" Click="BtnCheckUpdate_Click" />
+                    <Button x:Name="BtnDownloadUpdate" Visibility="Collapsed" Click="BtnDownloadUpdate_Click" />
+                    <Button x:Name="BtnIgnoreUpdate" Visibility="Collapsed" Click="BtnIgnoreUpdate_Click" />
                 </StackPanel>
                 <TextBlock x:Name="UpdateStatusText" FontSize="12" TextWrapping="Wrap"
                            Foreground="{ThemeResource AeTextSecondaryBrush}" />

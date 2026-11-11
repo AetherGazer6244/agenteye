@@ -1,5 +1,6 @@
 using AgentEye.Core.Config;
 using AgentEye.Core.Hotkeys;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.Core.Update;
 using AgentEye.WinUI.Services;
@@ -7,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Windows.System;
 
@@ -30,7 +32,7 @@ public sealed partial class SettingsPage : UserControl
     private const int VkShift = 0x10, VkControl = 0x11, VkMenu = 0x12,
                       VkLWin = 0x5B, VkRWin = 0x5C;
 
-    private const string RepoUrl = "https://github.com/Cecilian-Elysian/AgentEye";
+    private const string RepoUrl = "https://github.com/AetherGazer6244/AgentEye";
 
     [DllImport("user32.dll")]
     private static extern short GetKeyState(int nVirtKey);
@@ -39,28 +41,131 @@ public sealed partial class SettingsPage : UserControl
     private readonly MainWindow _main;
     private Dictionary<string, object?>? _editing; // 非 null = 编辑模式
     private bool _loading;                          // 回显期间不触发保存
+    private bool _testing;                          // 「测试」进行中,防重入
+    private bool _hotkeyWarned;                     // 当前失败状态已弹过窗(不重复弹)
     private CancellationTokenSource? _sizeDebounce;
 
     private readonly List<ThemeOption> _themeOptions =
     [
-        new("跟随系统", "auto"),
-        new("浅色", "light"),
-        new("深色", "dark"),
+        new(L.T("theme.auto"), "auto"),
+        new(L.T("theme.light"), "light"),
+        new(L.T("theme.dark"), "dark"),
     ];
 
-    // 1.2.1 只落库不切换;中英双语自 1.3.0 起生效
+    // 语言项用各自语言的自称(简体中文 / English),不需翻译
     private readonly List<LanguageOption> _languageOptions =
     [
         new("简体中文", "zh-Hans"),
+        new("English", "en"),
     ];
+
+    // 空串 = 自动识别(保存时走 Detect);具体 kind 由保存时定死
+    private readonly List<KindOption> _kindOptions =
+    [
+        new(L.T("form.kindAuto"), ""),
+        new(L.T("kind.deepseek"), "deepseek"),
+        new(L.T("kind.zhipu"), "zhipu"),
+        new(L.T("kind.minimax"), "minimax"),
+        new(L.T("kind.opencode_go"), "opencode_go"),
+        new(L.T("kind.siliconflow"), "siliconflow"),
+        new(L.T("kind.openrouter"), "openrouter"),
+        new(L.T("kind.generic_openai"), "generic_openai"),
+    ];
+
+    // 代理模式(1.5.2):direct=直连优先(缺省)/ auto=代理优先 / system=严格跟随
+    private readonly List<ProxyModeOption> _proxyModeOptions =
+    [
+        new(L.T("net.proxyMode.direct"), "direct"),
+        new(L.T("net.proxyMode.auto"), "auto"),
+        new(L.T("net.proxyMode.system"), "system"),
+    ];
+
+    /// <summary>有官方默认端点的 kind(base_url 可留空,拉取层有 fallback)。</summary>
+    private static readonly string[] OfficialKinds =
+        ["deepseek", "zhipu", "minimax", "opencode_go", "siliconflow", "openrouter"];
+
+    /// <summary>静态文案回填(语言启动定型,重启生效;unpackaged 无 resw 可用)。</summary>
+    private void ApplyStrings()
+    {
+        SecAppearance.Text = L.T("sec.appearance");
+        TxtThemeTitle.Text = L.T("theme.title");
+        TxtThemeSub.Text = L.T("theme.subtitle");
+        TxtAutostartTitle.Text = L.T("autostart.title");
+        TxtAutostartSub.Text = L.T("autostart.subtitle");
+        AutostartSwitch.OnContent = L.T("autostart.on");
+        AutostartSwitch.OffContent = L.T("autostart.off");
+        TxtCloseTrayTitle.Text = L.T("close.tray.title");
+        TxtCloseTraySub.Text = L.T("close.tray.subtitle");
+        CloseTraySwitch.OnContent = L.T("close.tray.on");
+        CloseTraySwitch.OffContent = L.T("close.tray.off");
+        TxtLangTitle.Text = L.T("lang.title");
+        TxtLangSub.Text = L.T("lang.subtitle");
+        SecNetwork.Text = L.T("sec.network");
+        TxtProxyTitle.Text = L.T("net.proxyModeTitle");
+        TxtProxySub.Text = L.T("net.proxyModeSub");
+        SecHotkey.Text = L.T("sec.hotkey");
+        TxtHotkeyTitle.Text = L.T("hotkey.title");
+        TxtHotkeySub.Text = L.T("hotkey.subtitle");
+        BtnClearHotkey.Content = L.T("hotkey.clear");
+        SecAlert.Text = L.T("sec.alert");
+        TxtAlertTitle.Text = L.T("alert.title");
+        TxtAlertSub.Text = L.T("alert.subtitle");
+        AlertEnable.OnContent = L.T("alert.on");
+        AlertEnable.OffContent = L.T("alert.off");
+        TxtWarnPct.Text = L.T("alert.warnPct");
+        TxtWarnPctSuffix.Text = L.T("alert.warnPctSuffix");
+        TxtCritAmount.Text = L.T("alert.critAmount");
+        TxtCritSuffix.Text = L.T("alert.critSuffix");
+        TxtQuietTitle.Text = L.T("alert.quiet.title");
+        TxtQuietSub.Text = L.T("alert.quiet.subtitle");
+        QuietSwitch.OnContent = L.T("alert.quiet.on");
+        QuietSwitch.OffContent = L.T("alert.quiet.off");
+        TxtQuietStart.Text = L.T("alert.quiet.startLabel");
+        TxtQuietEnd.Text = L.T("alert.quiet.endLabel");
+        SecApi.Text = L.T("sec.api");
+        TxtKeysLabel.Text = L.T("api.keysLabel");
+        BtnAddKey.Content = L.T("api.addKey");
+        BtnEdit.Content = L.T("api.edit");
+        BtnDelete.Content = L.T("api.delete");
+        FKey.PlaceholderText = L.T("form.keyPlaceholder");
+        FModel.PlaceholderText = L.T("form.modelPlaceholder");
+        TxtKindLabel.Text = L.T("form.kindLabel");
+        FBaseUrl.PlaceholderText = L.T("form.urlPlaceholder");
+        BtnTest.Content = L.T("form.test");
+        BtnSave.Content = L.T("form.save");
+        BtnCancel.Content = L.T("form.cancel");
+        SecAdv.Text = L.T("sec.adv");
+        TxtSizeTitle.Text = L.T("adv.sizeTitle");
+        TxtSizeSub.Text = L.T("adv.sizeSubtitle");
+        TxtWidthLabel.Text = L.T("adv.width");
+        TxtHeightLabel.Text = L.T("adv.height");
+        BtnResetSize.Content = L.T("adv.resetSize");
+        TxtAdaptiveTitle.Text = L.T("adv.adaptive.title");
+        TxtAdaptiveSub.Text = L.T("adv.adaptive.subtitle");
+        AdaptiveSwitch.OnContent = L.T("adv.adaptive.on");
+        AdaptiveSwitch.OffContent = L.T("adv.adaptive.off");
+        SecAbout.Text = L.T("sec.about");
+        TxtAboutTitle.Text = L.T("about.title");
+        TxtAboutSub.Text = L.T("about.subtitle");
+        BtnAboutDetails.Content = L.T("about.details");
+        BtnCheckUpdate.Content = L.T("update.check");
+        BtnDownloadUpdate.Content = L.T("update.download");
+        BtnIgnoreUpdate.Content = L.T("update.ignore");
+    }
 
     public SettingsPage(AppServices app, MainWindow main)
     {
         InitializeComponent();
+        // 页面可持有焦点:ComboBox 选中后把焦点交回页面,否则带焦点的下拉
+        // 会被滚轮改选项(主题选完一滚就切回去的元凶)
+        IsTabStop = true;
+        ApplyStrings();
         _app = app;
         _main = main;
         ThemeCombo.ItemsSource = _themeOptions;
         LanguageCombo.ItemsSource = _languageOptions;
+        FKind.ItemsSource = _kindOptions;
+        ProxyModeCombo.ItemsSource = _proxyModeOptions;
         LoadGeneral();
         ReloadList();
         app.ConfigSaved += ReloadList;
@@ -75,11 +180,16 @@ public sealed partial class SettingsPage : UserControl
         ShowListPane();
         LoadGeneral();
         ReloadList();
-        // 热键当前注册失败(组合被别的程序占用)时提示一次;
-        // 启动阶段不弹——增强面静默降级,别在开机时打扰用户
-        var status = _main.HotkeyStatus;
-        if (status.StartsWith("注册失败", StringComparison.Ordinal))
-            _ = ShowErrorAsync("快捷键未生效", status);
+        // 热键没生效(被占用/组合非法/服务异常)时提示一次;
+        // 同一个失败状态只弹一次,恢复了下次再犯才再弹
+        if (_main.HotkeyOk)
+        {
+            _hotkeyWarned = false;
+            return;
+        }
+        if (_hotkeyWarned) return;
+        _hotkeyWarned = true;
+        _ = ShowErrorAsync(L.T("hotkey.notEffective"), _main.HotkeyStatus);
     }
 
     /// <summary>错误提示走弹窗(设置页不保留常驻状态小字)。</summary>
@@ -92,7 +202,7 @@ public sealed partial class SettingsPage : UserControl
                 XamlRoot = XamlRoot,
                 Title = title,
                 Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-                CloseButtonText = "好",
+                CloseButtonText = L.T("common.close"),
             };
             await dialog.ShowAsync();
         }
@@ -113,7 +223,11 @@ public sealed partial class SettingsPage : UserControl
         {
             ThemeCombo.SelectedIndex = Math.Max(0, _themeOptions.FindIndex(o => o.Value == _app.ThemeChoice));
             AutostartSwitch.IsOn = StartupService.IsEnabled();
-            LanguageCombo.SelectedIndex = 0;
+            CloseTraySwitch.IsOn = _app.CloseToTray;
+            LanguageCombo.SelectedIndex = Math.Max(0,
+                _languageOptions.FindIndex(o => o.Value == _app.Language));
+            ProxyModeCombo.SelectedIndex = Math.Max(0,
+                _proxyModeOptions.FindIndex(o => o.Value == _app.ProxyModeChoice));
 
             HotkeyBox.Text = _app.HotkeyText;
 
@@ -123,12 +237,18 @@ public sealed partial class SettingsPage : UserControl
             WarnPctBox.Value = alert.TryGetValue("warn_pct", out var w) ? Convert.ToDouble(w) : 30;
             CriticalYuanBox.Value = alert.TryGetValue("critical_amount_yuan", out var c)
                 ? Convert.ToDouble(c) : 5.0;
+            // 免打扰(1.6.0):两个键都能解析才算开;缺省 23:00–08:00
+            QuietSwitch.IsOn = QuietConfigured(alert);
+            QuietStartPicker.Time = QuietTimeOr(alert, "quiet_start", fallbackMinutes: 23 * 60);
+            QuietEndPicker.Time = QuietTimeOr(alert, "quiet_end", fallbackMinutes: 8 * 60);
+            SyncQuietTimes();
 
             WidthBox.Value = _app.WindowWidth;
             HeightBox.Value = _app.WindowHeight;
+            AdaptiveSwitch.IsOn = _app.AdaptivePoll;
 
-            VersionText.Text = $"当前版本 v{UpdateService.CurrentVersion}" +
-                               $"(更新源 github.com/{UpdateChecker.Owner}/{UpdateChecker.Repo})";
+            VersionText.Text = L.F("update.versionLine",
+                UpdateService.CurrentVersion, UpdateChecker.Owner, UpdateChecker.Repo);
         }
         finally
         {
@@ -149,6 +269,7 @@ public sealed partial class SettingsPage : UserControl
         _main.ApplyTheme(choice);
         _app.TrySaveCfg();
         _main.RefreshOverviewPalette();
+        BlurFocus(ThemeCombo);
     }
 
     // ------------------------------------------------------------------
@@ -170,12 +291,55 @@ public sealed partial class SettingsPage : UserControl
             _loading = true;
             AutostartSwitch.IsOn = !want;
             _loading = false;
-            _ = ShowErrorAsync("无法设置开机自启动", error ?? "写入启动项失败");
+            _ = ShowErrorAsync(L.T("autostart.errorTitle"),
+                error ?? L.T("autostart.errorDefault"));
         }
     }
 
     // ------------------------------------------------------------------
-    // 语言(1.2.1 先落库,中英双语 1.3.0 起可切)
+    // 关窗行为(ui.close_to_tray):开 = X 隐藏进托盘(默认),关 = X 直接退出
+    // ------------------------------------------------------------------
+
+    private void CloseTraySwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _app.SetCloseToTray(CloseTraySwitch.IsOn);
+        _app.TrySaveCfg();
+    }
+
+    // ------------------------------------------------------------------
+    // 代理模式(ui.proxy_mode):Direct=直连优先(默认)/ Auto=代理优先 / System=严格跟随
+    // ------------------------------------------------------------------
+
+    private void ProxyModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        if (ProxyModeCombo.SelectedIndex < 0) return;
+        var mode = _proxyModeOptions[ProxyModeCombo.SelectedIndex].Value;
+        if (mode == _app.ProxyModeChoice) return;
+        _app.SetProxyMode(mode);
+        _app.TrySaveCfg();
+        BlurFocus(ProxyModeCombo);
+        // 立即按新模式拉一轮:兜底开没开,下一秒面板上就能看出来
+        _ = _app.Poller.RefreshNowAsync();
+    }
+
+    /// <summary>
+    /// 把焦点从下拉框挪回页面:WinUI 里带焦点的 ComboBox 会被滚轮改选项,
+    /// 选完主题一滚轮就"切回去"就是它。焦点交还页面后,滚轮恢复滚动页面。
+    /// </summary>
+    private void BlurFocus(ComboBox combo)
+    {
+        try
+        {
+            combo.IsDropDownOpen = false;
+            Focus(FocusState.Programmatic);
+        }
+        catch { /* 焦点挪不动也无碍:只是滚轮可能还会改下拉 */ }
+    }
+
+    // ------------------------------------------------------------------
+    // 语言(1.3.0 起中英可切;重启生效——整套文案在启动时一次定型)
     // ------------------------------------------------------------------
 
     private void LanguageCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -183,8 +347,53 @@ public sealed partial class SettingsPage : UserControl
         if (_loading) return;
         if (LanguageCombo.SelectedIndex < 0) return;
         var lang = _languageOptions[LanguageCombo.SelectedIndex].Value;
+        if (lang == _app.Language) return;
         _app.SetLanguage(lang);
         _app.TrySaveCfg();
+        BlurFocus(LanguageCombo);
+        _ = ShowRestartDialogAsync();
+    }
+
+    /// <summary>语言切换提示:重启生效,可立即重启(增强面:失败静默回提示)。</summary>
+    private async Task ShowRestartDialogAsync()
+    {
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = L.T("lang.saved"),
+                Content = new TextBlock
+                {
+                    Text = L.T("lang.restart.msg"),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                PrimaryButtonText = L.T("lang.restart.now"),
+                CloseButtonText = L.T("common.close"),
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary) RestartApp();
+        }
+        catch
+        {
+            // 弹不出来(无 XamlRoot 等):设置已保存,用户下次重启自然生效
+        }
+    }
+
+    private void RestartApp()
+    {
+        try
+        {
+            var exe = Path.Combine(AppContext.BaseDirectory, "AgentEye.exe");
+            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
+            // 真退出走 ExitFromTray:关闭拦截放行 + 完整清理(托盘图标不残留)
+            _main.ExitFromTray();
+        }
+        catch
+        {
+            _ = ShowErrorAsync(L.T("common.error"), L.T("app.restartFailed"));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -224,7 +433,8 @@ public sealed partial class SettingsPage : UserControl
         if (!HotkeySpec.TryFromVirtualKey((int)e.Key, mods, out var spec, out var error) ||
             spec is null)
         {
-            _ = ShowErrorAsync("组合无效", error ?? "请按字母/数字/功能键");
+            _ = ShowErrorAsync(L.T("hotkey.invalidCombo"),
+                error ?? L.T("hotkey.invalidDefault"));
             return;
         }
         ApplyHotkey(spec.ToText(), true);
@@ -256,7 +466,8 @@ public sealed partial class SettingsPage : UserControl
         if (!HotkeySpec.TryParse(text, out var spec, out var error) || spec is null)
         {
             HotkeyBox.Text = _app.HotkeyText;
-            _ = ShowErrorAsync("组合无效", $"{error}(例如 Ctrl+Shift+A)");
+            _ = ShowErrorAsync(L.T("hotkey.invalidCombo"),
+                L.F("hotkey.invalidExample", error));
             return;
         }
         ApplyHotkey(spec.ToText(), true);
@@ -268,10 +479,15 @@ public sealed partial class SettingsPage : UserControl
         _app.TrySaveCfg();
         _main.ApplyHotkey();
         HotkeyBox.Text = _app.HotkeyText;
-        // 注册失败(被别的程序占用)才提示;成功静默,界面不留状态小字
-        var status = _main.HotkeyStatus;
-        if (status.StartsWith("注册失败", StringComparison.Ordinal))
-            _ = ShowErrorAsync("快捷键未生效", status);
+        // 失败一律走弹窗(被占用/组合非法/服务异常都算,不再只认"注册失败"开头);
+        // 成功静默,界面不留状态小字
+        if (_main.HotkeyOk)
+        {
+            _hotkeyWarned = false;
+            return;
+        }
+        _hotkeyWarned = true;
+        _ = ShowErrorAsync(L.T("hotkey.notEffective"), _main.HotkeyStatus);
     }
 
     private void BtnClearHotkey_Click(object sender, RoutedEventArgs e)
@@ -351,7 +567,66 @@ public sealed partial class SettingsPage : UserControl
         alert["enable"] = AlertEnable.IsOn;
         alert["warn_pct"] = (int)Math.Clamp(WarnPctBox.Value, 0, 100);
         alert["critical_amount_yuan"] = Math.Max(0, CriticalYuanBox.Value);
+        // 免打扰(1.6.0):开 = 落 "HH:mm";关 = 置空串(与模板缺省一致)
+        if (QuietSwitch.IsOn)
+        {
+            alert["quiet_start"] = QuietText(QuietStartPicker.Time);
+            alert["quiet_end"] = QuietText(QuietEndPicker.Time);
+        }
+        else
+        {
+            alert["quiet_start"] = "";
+            alert["quiet_end"] = "";
+        }
         _app.TrySaveCfg();
+    }
+
+    // ------------------------------------------------------------------
+    // 告警免打扰时段(1.6.0)
+    // ------------------------------------------------------------------
+
+    /// <summary>两个 quiet 键都能解析出时间才视为「已配置」。</summary>
+    private static bool QuietConfigured(Dictionary<string, object?> alert) =>
+        AgentEye.Core.Alerts.QuietHours.ParseMinutes(alert.TryGetValue("quiet_start", out var s) ? s as string : null)
+            is not null &&
+        AgentEye.Core.Alerts.QuietHours.ParseMinutes(alert.TryGetValue("quiet_end", out var e) ? e as string : null)
+            is not null;
+
+    /// <summary>quiet 键 → TimeSpan;没配给缺省值(开始 23:00 / 结束 08:00)。</summary>
+    private static TimeSpan QuietTimeOr(Dictionary<string, object?> alert, string key, int fallbackMinutes) =>
+        TimeSpan.FromMinutes(AgentEye.Core.Alerts.QuietHours.ParseMinutes(
+            alert.TryGetValue(key, out var v) ? v as string : null) ?? fallbackMinutes);
+
+    private static string QuietText(TimeSpan time) =>
+        $"{(int)time.TotalHours:D2}:{time.Minutes:D2}";
+
+    private void SyncQuietTimes() =>
+        QuietTimes.Visibility = QuietSwitch.IsOn ? Visibility.Visible : Visibility.Collapsed;
+
+    private void QuietSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        SyncQuietTimes();
+        if (_loading) return;
+        ApplyAlert();
+    }
+
+    private void QuietTime_Changed(TimePicker sender, TimePickerSelectedValueChangedEventArgs args)
+    {
+        if (_loading) return;
+        if (QuietSwitch.IsOn) ApplyAlert();
+    }
+
+    // ------------------------------------------------------------------
+    // 自适应轮询(1.6.0)
+    // ------------------------------------------------------------------
+
+    private void AdaptiveSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _app.SetAdaptivePoll(AdaptiveSwitch.IsOn);
+        _app.TrySaveCfg();
+        // 重建循环让新节奏立刻生效(不等到原周期到点)
+        _app.Poller.Reschedule();
     }
 
     // ------------------------------------------------------------------
@@ -378,7 +653,7 @@ public sealed partial class SettingsPage : UserControl
 
     private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
-        UpdateStatusText.Text = "正在检查更新…";
+        UpdateStatusText.Text = L.T("update.checking");
         await _app.Update.CheckAsync(silent: false);
     }
 
@@ -391,7 +666,7 @@ public sealed partial class SettingsPage : UserControl
             {
                 UpdateProgress.Visibility = Visibility.Visible;
                 UpdateProgress.Value = p;
-                UpdateStatusText.Text = $"正在下载并更新… {p}%";
+                UpdateStatusText.Text = L.F("update.downloading", p);
             });
         });
         var error = await _app.Update.DownloadAndApplyAsync(progress);
@@ -462,11 +737,11 @@ public sealed partial class SettingsPage : UserControl
     public static async Task ConfirmDeleteAsync(
         AppServices app, FrameworkElement host, string name)
     {
-        var input = new TextBox { PlaceholderText = $"输入 {name} 以确认" };
+        var input = new TextBox { PlaceholderText = L.F("delete.confirmInput", name) };
         var dialog = new ContentDialog
         {
             XamlRoot = host.XamlRoot,
-            Title = $"删除 {name}",
+            Title = L.F("delete.title", name),
             Content = new StackPanel
             {
                 Spacing = 8,
@@ -474,14 +749,14 @@ public sealed partial class SettingsPage : UserControl
                 {
                     new TextBlock
                     {
-                        Text = "此操作会从配置里移除该 provider 与其 key。",
+                        Text = L.T("delete.body"),
                         TextWrapping = TextWrapping.Wrap,
                     },
                     input,
                 },
             },
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
+            PrimaryButtonText = L.T("api.delete"),
+            CloseButtonText = L.T("form.cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
         var result = await dialog.ShowAsync();
@@ -516,6 +791,17 @@ public sealed partial class SettingsPage : UserControl
     {
         _editing = null;
         ClearForm();
+        _loading = true;
+        try
+        {
+            FKind.IsEnabled = true;
+            FKind.SelectedIndex = 0;
+        }
+        finally
+        {
+            _loading = false;
+        }
+        FormDetect.Visibility = Visibility.Collapsed;
         ShowFormPane();
     }
 
@@ -537,6 +823,7 @@ public sealed partial class SettingsPage : UserControl
         ListPane.Visibility = Visibility.Collapsed;
         FormPane.Visibility = Visibility.Visible;
         FormError.Visibility = Visibility.Collapsed;
+        FormResult.Visibility = Visibility.Collapsed;
     }
 
     private void ShowListPane()
@@ -552,6 +839,7 @@ public sealed partial class SettingsPage : UserControl
         FBaseUrl.Text = "";
         FKey.Text = "";
         FModel.Text = "";
+        FModel.ItemsSource = null;
     }
 
     private void LoadForm(Dictionary<string, object?> p)
@@ -564,11 +852,18 @@ public sealed partial class SettingsPage : UserControl
             // key 留空 = 沿用已存(明文/密文都行,保存时解好放内存)
             FKey.Text = AppServices.PlainKey(p);
             FModel.Text = p.TryGetValue("model", out var m) && m is string ms ? ms : "";
+            // 编辑态 kind 定死(改 kind 会破坏 extra 语义):下拉禁用只回显
+            var kind = p.TryGetValue("kind", out var k) && k is string ks ? ks : "";
+            FKind.IsEnabled = false;
+            FKind.SelectedIndex = Math.Max(0,
+                _kindOptions.FindIndex(o => o.Value == kind));
         }
         finally
         {
             _loading = false;
         }
+        FormDetect.Visibility = Visibility.Collapsed;
+        FormResult.Visibility = Visibility.Collapsed;
     }
 
     private void ShowFormError(string? msg)
@@ -582,22 +877,148 @@ public sealed partial class SettingsPage : UserControl
         FormError.Visibility = Visibility.Visible;
     }
 
+    // ------------------------------------------------------------------
+    // 类型下拉 + 识别预览(纯本地正则,无网络)
+    // ------------------------------------------------------------------
+
+    private string SelectedKind =>
+        FKind.SelectedIndex >= 0 ? _kindOptions[FKind.SelectedIndex].Value : "";
+
+    private string KindLabel(string kind) => L.T("kind." + kind);
+
+    private void FKind_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        // 选官方类型时把默认端点填进 URL:仅在"空 or 还是别的官方默认"时,
+        // 用户手敲的自定义 URL 不动
+        var kind = SelectedKind;
+        if (OfficialKinds.Contains(kind))
+        {
+            var def = ConfigStore.DefaultBaseUrl(kind);
+            var cur = FBaseUrl.Text.Trim();
+            if (def.Length > 0 &&
+                (cur.Length == 0 || OfficialKinds.Any(k => ConfigStore.DefaultBaseUrl(k) == cur)))
+                FBaseUrl.Text = def;
+        }
+        UpdateDetectPreview();
+        BlurFocus(FKind);
+    }
+
+    private void FBaseUrl_LostFocus(object sender, RoutedEventArgs e) => UpdateDetectPreview();
+
+    private void FKey_LostFocus(object sender, RoutedEventArgs e) => UpdateDetectPreview();
+
+    /// <summary>自动识别态且填了内容时,实时展示 Detect 结论(JWT 撞形等提示不再丢失)。</summary>
+    private void UpdateDetectPreview()
+    {
+        if (_editing is not null || SelectedKind.Length > 0)
+        {
+            FormDetect.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var baseUrl = FBaseUrl.Text.Trim();
+        var key = FKey.Text.Trim();
+        if (baseUrl.Length == 0 && key.Length == 0)
+        {
+            FormDetect.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var d = Detect.Run(key: key, hintUrl: baseUrl);
+        FormDetect.Text = L.F("form.detect", KindLabel(d.Kind), d.Notes);
+        FormDetect.Visibility = Visibility.Visible;
+    }
+
+    // ------------------------------------------------------------------
+    // 测试 Key:表单当前值跑一次真实拉取(不落盘),顺带填充模型下拉
+    // ------------------------------------------------------------------
+
+    private async void BtnTest_Click(object sender, RoutedEventArgs e)
+    {
+        if (_testing) return;
+        var baseUrl = FBaseUrl.Text.Trim();
+        var key = FKey.Text.Trim();
+        var model = FModel.Text.Trim();
+        var kind = SelectedKind.Length > 0 ? SelectedKind
+            : Detect.Run(key: key, hintUrl: baseUrl).Kind;
+        if (baseUrl.Length == 0 && !OfficialKinds.Contains(kind))
+        {
+            ShowFormError(L.T("form.errEmptyUrl"));
+            return;
+        }
+
+        _testing = true;
+        BtnTest.IsEnabled = false;
+        BtnSave.IsEnabled = false;
+        ShowFormResult(null, L.T("form.testing"));
+        try
+        {
+            var outcome = await ProviderTest.RunAsync(kind, baseUrl, key, model);
+            var line = L.F(outcome.Ok ? "form.testOk" : "form.testFail", outcome.Message);
+            if (outcome.Models.Count > 0)
+            {
+                FillModelCombo(outcome.Models);
+                line += " · " + L.F("form.modelsLoaded", outcome.Models.Count);
+            }
+            ShowFormResult(outcome.Ok, line);
+        }
+        finally
+        {
+            _testing = false;
+            BtnTest.IsEnabled = true;
+            BtnSave.IsEnabled = true;
+        }
+    }
+
+    /// <summary>结果行:null=中性(进行中),true=绿,false=红(等级色均主题无关,直引安全)。</summary>
+    private void ShowFormResult(bool? ok, string msg)
+    {
+        FormResult.Foreground = ok is { } flagged
+            ? AeRes.Brush(this, flagged ? "AeOkBrush" : "AeErrorBrush")
+            : AeRes.Brush(this, "AeTextSecondaryBrush");
+        FormResult.Text = msg;
+        FormResult.Visibility = msg.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>模型下拉填充:保留用户已输入/已选的值。</summary>
+    private void FillModelCombo(IReadOnlyList<string> models)
+    {
+        var current = FModel.Text;
+        // 填充是程序动作,不算用户选择:别触发 BlurFocus 抢走正在输入的焦点
+        _loading = true;
+        try { FModel.ItemsSource = models; }
+        finally { _loading = false; }
+        FModel.Text = current;
+    }
+
+    private void FModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        BlurFocus(FModel);
+    }
+
     private async void BtnSave_Click(object sender, RoutedEventArgs e)
     {
         var baseUrl = FBaseUrl.Text.Trim();
         var key = FKey.Text.Trim();
         var model = FModel.Text.Trim();
 
-        if (baseUrl.Length == 0)
+        // 新增:下拉选了具体 kind 就不跑 Detect;编辑:kind 保持不变
+        var kind = _editing is not null
+            ? _editing.TryGetValue("kind", out var k0) && k0 is string ks0 ? ks0 : ""
+            : SelectedKind.Length > 0 ? SelectedKind
+            : Detect.Run(key: key, hintUrl: baseUrl).Kind;
+
+        // 官方 kind 拉取层对空 URL 有 fallback,允许留空;通用兼容必须给
+        if (baseUrl.Length == 0 && !OfficialKinds.Contains(kind))
         {
-            ShowFormError("Base URL 不能为空");
+            ShowFormError(L.T("form.errEmptyUrl"));
             return;
         }
 
-        // 名称自动取 URL 域名,重名追加 -2/-3;编辑时保持原名不变
+        // 名称自动取 URL 域名(留空时用类型名),重名追加 -2/-3;编辑时保持原名不变
         // (改名会让暂停集合与托盘最紧张行的索引错位)
         var name = _editing is not null ? TryGetName(_editing)
-            : UniqueName(NameFromUrl(baseUrl));
+            : UniqueName(baseUrl.Length > 0 ? NameFromUrl(baseUrl) : KindLabel(kind));
 
         Dictionary<string, object?> entry;
         if (_editing is not null)
@@ -621,11 +1042,11 @@ public sealed partial class SettingsPage : UserControl
             : "";
         if (_editing is null)
         {
-            // kind 只在新增时推断;已有条目改 kind 会破坏 extra 语义,走 config
-            entry["kind"] = Detect.Run(key: key, hintUrl: baseUrl).Kind;
+            // kind 只在新增时定死;已有条目改 kind 会破坏 extra 语义,走 config
+            entry["kind"] = kind;
         }
         entry["name"] = name;
-        entry["base_url"] = baseUrl;
+        SetOrRemove(entry, "base_url", baseUrl);
         if (newKey.Length > 0)
             entry["key"] = newKey;
         SetOrRemove(entry, "model", model);
@@ -636,7 +1057,7 @@ public sealed partial class SettingsPage : UserControl
         {
             // 写盘失败:把刚加的新条目回滚,别让内存态和磁盘态分叉
             if (_editing is null) ConfigStore.GetList(_app.Cfg, "providers").Remove(entry);
-            ShowFormError($"保存失败:{err}");
+            ShowFormError(L.F("form.errSave", err));
             return;
         }
         ShowListPane();
@@ -674,4 +1095,8 @@ public sealed partial class SettingsPage : UserControl
     private sealed record ThemeOption(string Text, string Value);
 
     private sealed record LanguageOption(string Text, string Value);
+
+    private sealed record KindOption(string Text, string Value);
+
+    private sealed record ProxyModeOption(string Text, string Value);
 }

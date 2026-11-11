@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using AgentEye.Core.Localization;
 using Microsoft.Win32;
 
 namespace AgentEye.WinUI.Services;
@@ -55,7 +56,7 @@ public static class StartupService
                             ?? Registry.CurrentUser.CreateSubKey(RunSubKey, writable: true);
             if (key is null)
             {
-                error = "无法打开启动项注册表";
+                error = L.T("startup.errOpen");
                 return false;
             }
             if (enabled)
@@ -70,12 +71,12 @@ public static class StartupService
         }
         catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException)
         {
-            error = "写入启动项被拒绝(权限不足?)";
+            error = L.T("startup.errDenied");
             return false;
         }
         catch (Exception e) when (e is IOException or ArgumentException)
         {
-            error = $"写入启动项失败:{e.Message}";
+            error = L.F("startup.errWrite", e.Message);
             return false;
         }
     }
@@ -114,6 +115,26 @@ public static class StartupService
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// 自愈:已登记但命令行指向的不是当前 exe(挪目录/换盘/重装到新路径)时
+    /// 静默重写,避免"开关显示开着、开机却拉不起"的假自启。失败不管(增强面)。
+    /// </summary>
+    public static void EnsureCurrent()
+    {
+        try
+        {
+            if (!IsEnabled()) return;
+            var registered = CurrentCommand();
+            if (string.Equals(registered, CommandLine(), StringComparison.OrdinalIgnoreCase))
+                return;
+            SetEnabled(true, out _);
+        }
+        catch
+        {
+            // 增强面:自愈失败不影响主流程
         }
     }
 }

@@ -13,10 +13,12 @@
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="AeBackdropBrush" Color="#F3F3F3" />
                     <SolidColorBrush x:Key="AeCardBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="AeCardStrokeBrush" Color="#E0E0E0" />
+                    <SolidColorBrush x:Key="AeCardStrokeBrush" Color="#C8CDD4" />
+                    <SolidColorBrush x:Key="AeSubtleFillBrush" Color="#F0F1F4" />
+                    <SolidColorBrush x:Key="AeAccentTintBrush" Color="#E8F0FB" />
                     <SolidColorBrush x:Key="AeTextPrimaryBrush" Color="#1A1A1A" />
                     <SolidColorBrush x:Key="AeTextSecondaryBrush" Color="#5E5E5E" />
-                    <SolidColorBrush x:Key="AeDividerBrush" Color="#E8E8E8" />
+                    <SolidColorBrush x:Key="AeDividerBrush" Color="#E2E5EA" />
                     <!-- Acrylic 材质负责玻璃感,这里只留 10% 薄纱保文字可读 + 跨主题一致 -->
                     <SolidColorBrush x:Key="AeGlassTintBrush" Color="#1AF2F2F2" />
                 </ResourceDictionary>
@@ -24,10 +26,12 @@
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="AeBackdropBrush" Color="#202020" />
                     <SolidColorBrush x:Key="AeCardBrush" Color="#2B2B2B" />
-                    <SolidColorBrush x:Key="AeCardStrokeBrush" Color="#383838" />
+                    <SolidColorBrush x:Key="AeCardStrokeBrush" Color="#3D4148" />
+                    <SolidColorBrush x:Key="AeSubtleFillBrush" Color="#2E2E2E" />
+                    <SolidColorBrush x:Key="AeAccentTintBrush" Color="#1E2A3A" />
                     <SolidColorBrush x:Key="AeTextPrimaryBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="AeTextSecondaryBrush" Color="#A0A0A0" />
-                    <SolidColorBrush x:Key="AeDividerBrush" Color="#333333" />
+                    <SolidColorBrush x:Key="AeDividerBrush" Color="#383838" />
                     <SolidColorBrush x:Key="AeGlassTintBrush" Color="#1F000000" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>

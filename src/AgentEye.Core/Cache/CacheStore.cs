@@ -325,6 +325,8 @@ public sealed class CacheStore
     /// <summary>
     /// 原子保存 per-provider 告警冷却状态,让 60 分钟冷却跨重启生效。
     /// notified 形如 {"DeepSeek": ["critical", 1758000000.0], ...}。
+    /// 1.6.0 起等级集合含 "error"(连续拉取失败告警共用同一份冷却);
+    /// 同文件的 "errors" 键(失败轮数)必须保留,不能整文件覆盖。
     /// </summary>
     public void SaveAlertState(IReadOnlyDictionary<string, (string Level, double Ts)> notified)
     {
@@ -333,7 +335,7 @@ public sealed class CacheStore
         var clean = new Dictionary<string, object?>();
         foreach (var (name, (level, ts)) in notified)
         {
-            if (level is not ("warn" or "critical")) continue;
+            if (level is not ("warn" or "critical" or "error")) continue;
             // NTP 回拨 / 手改文件都可能给出未来的时间戳:不夹取的话
             // 冷却判定会把这个 provider 静默到天荒地老
             if (ts > now + 60) continue;
@@ -341,7 +343,9 @@ public sealed class CacheStore
         }
         lock (_lock)
         {
-            SaveJson(AlertStatePath, new Dictionary<string, object?> { ["notified"] = clean });
+            var data = LoadJson(AlertStatePath) ?? new Dictionary<string, object?>();
+            data["notified"] = clean;
+            SaveJson(AlertStatePath, data);
         }
     }
 
@@ -359,10 +363,65 @@ public sealed class CacheStore
         foreach (var (name, value) in rawDict)
         {
             if (value is not List<object?> pair || pair.Count != 2) continue;
-            if (pair[0] is not string level || level is not ("warn" or "critical")) continue;
+            if (pair[0] is not string level ||
+                level is not ("warn" or "critical" or "error")) continue;
             if (pair[1] is not double ts) continue;
             if (ts > now + 60) continue;
             output[name] = (level, ts);
+        }
+        return output;
+    }
+
+    // ------------------------------------------------------------------
+    // 连续拉取失败轮数(1.6.0)
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// 保存每 provider 的「连续拉取失败」轮数,存 alert_state.json 的 "errors"
+    /// 键(与冷却状态同文件,互相保留对方的键)。"notified" 缺失时补空表,
+    /// 让两套状态无论谁先写都完整。
+    /// </summary>
+    public void SaveErrorStreaks(IReadOnlyDictionary<string, (int Streak, double Ts)> streaks)
+    {
+        Ensure();
+        var now = Http.Now();
+        var clean = new Dictionary<string, object?>();
+        foreach (var (name, (streak, ts)) in streaks)
+        {
+            if (streak <= 0) continue;
+            if (ts > now + 60) continue;
+            clean[name] = new List<object?> { (double)streak, ts };
+        }
+        lock (_lock)
+        {
+            var data = LoadJson(AlertStatePath) ?? new Dictionary<string, object?>();
+            if (!data.ContainsKey("notified")) data["notified"] = new Dictionary<string, object?>();
+            data["errors"] = clean;
+            SaveJson(AlertStatePath, data);
+        }
+    }
+
+    /// <summary>读取连续失败轮数。缺失/损坏/坏行一律丢弃(返回空表 = 从 1 重新数)。</summary>
+    public Dictionary<string, (int Streak, double Ts)> LoadErrorStreaks()
+    {
+        Ensure();
+        var data = LoadJson(AlertStatePath);
+        if (data is null ||
+            !data.TryGetValue("errors", out var raw) ||
+            raw is not Dictionary<string, object?> rawDict)
+            return [];
+        var output = new Dictionary<string, (int, double)>();
+        var now = Http.Now();
+        foreach (var (name, value) in rawDict)
+        {
+            if (value is not List<object?> pair || pair.Count != 2) continue;
+            double streak;
+            try { streak = Convert.ToDouble(pair[0], System.Globalization.CultureInfo.InvariantCulture); }
+            catch { continue; }
+            if (streak <= 0) continue;
+            if (pair[1] is not double ts) continue;
+            if (ts > now + 60) continue;
+            output[name] = ((int)streak, ts);
         }
         return output;
     }

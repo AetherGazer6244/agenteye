@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -26,8 +27,8 @@ public static class GenericOpenAi
     {
         var bas = (e.BaseUrl ?? "").TrimEnd('/');
         var key = e.ApiKey ?? "";
-        if (bas.Length == 0) return FetchPayload.Err("缺少 base_url", unconfigured: true);
-        if (key.Length == 0) return FetchPayload.Err("缺少 key", unconfigured: true);
+        if (bas.Length == 0) return FetchPayload.Err(L.T("gen.noBaseUrl"), unconfigured: true);
+        if (key.Length == 0) return FetchPayload.Err(L.T("gen.noKey"), unconfigured: true);
 
         var headers = new Dictionary<string, string>
         {
@@ -42,21 +43,21 @@ public static class GenericOpenAi
         {
             var (label, path, parse) = QuotaProbes[i];
             var isLast = i + 1 >= QuotaProbes.Length;
-            var (ok, status, body) = await Http.GetJsonAsync(
+            var (ok, status, body, why) = await Http.GetJsonAsync(
                 bas + path, headers, Http.DefaultTimeoutSec, ct);
             if (!ok)
             {
-                errors.Add($"{label}: 网络错误");
+                errors.Add(Http.WithReason(L.F("gen.labelNet", label), why));
                 continue;
             }
             if (status == 401)
                 // 鉴权层拒绝与路径无关,直接判 key 无效,不重试其它端点
-                return FetchPayload.Err("key 无效 (HTTP 401)");
+                return FetchPayload.Err(L.F("pr.keyInvalid", 401));
             if (status == 403)
             {
                 // 403 只在末位(已知正确的)端点上判 key 无效:nginx/WAF
                 // 对猜测性的管理路径返回 403 很常见
-                if (isLast) return FetchPayload.Err("key 无效 (HTTP 403)");
+                if (isLast) return FetchPayload.Err(L.F("pr.keyInvalid", 403));
                 errors.Add($"{label}: HTTP 403");
                 continue;
             }
@@ -67,7 +68,7 @@ public static class GenericOpenAi
             }
             if (!Http.IsObj(body))
             {
-                errors.Add($"{label}: 非JSON");
+                errors.Add(L.F("gen.labelNotJson", label));
                 continue;
             }
             var result = parse(body, e);
@@ -78,7 +79,7 @@ public static class GenericOpenAi
                 parsed = result;
                 break;
             }
-            errors.Add($"{label}: 结构未识别");
+            errors.Add(L.F("gen.labelStruct", label));
         }
 
         if (parsed is null)
@@ -125,11 +126,11 @@ public static class GenericOpenAi
     /// 200 = key+model 可用;401/403 = key 无效;404 = 端点或模型不存在。
     /// </summary>
     public static ModelProbeOutcome ClassifyModelProbe(bool netOk, int status) =>
-        !netOk ? new ModelProbeOutcome(false, "模型探测: 网络错误")
-        : status == 200 ? new ModelProbeOutcome(true, "key+model 可用 (模型探测通过)")
-        : status is 401 or 403 ? new ModelProbeOutcome(false, $"key 无效 (HTTP {status})")
-        : status == 404 ? new ModelProbeOutcome(false, "模型探测: 端点或模型不存在 (HTTP 404)")
-        : new ModelProbeOutcome(false, $"模型探测: HTTP {status}");
+        !netOk ? new ModelProbeOutcome(false, L.T("gen.probeNet"))
+        : status == 200 ? new ModelProbeOutcome(true, L.T("gen.probeOk"))
+        : status is 401 or 403 ? new ModelProbeOutcome(false, L.F("pr.keyInvalid", status))
+        : status == 404 ? new ModelProbeOutcome(false, L.T("gen.probe404"))
+        : new ModelProbeOutcome(false, L.F("gen.probeHttp", status));
 
     /// <summary>带 model 的真实对话探测;未配 model 返回 null(调用方走原错误)。</summary>
     public static async Task<FetchPayload?> ProbeModelAsync(
@@ -138,7 +139,7 @@ public static class GenericOpenAi
         var bas = (e.BaseUrl ?? "").TrimEnd('/');
         var url = bas.EndsWith("/v1") ? bas + "/chat/completions"
             : bas + "/v1/chat/completions";
-        var (ok, status, _) = await Http.PostJsonAsync(url,
+        var (ok, status, _, _) = await Http.PostJsonAsync(url,
             new Dictionary<string, string> { ["Authorization"] = $"Bearer {e.ApiKey}" },
             new Dictionary<string, object?>
             {
@@ -161,19 +162,19 @@ public static class GenericOpenAi
     {
         var bas = (e.BaseUrl ?? "").TrimEnd('/');
         var key = e.ApiKey ?? "";
-        if (bas.Length == 0) return new ModelsOutcome(null, "缺少 base_url");
-        if (key.Length == 0) return new ModelsOutcome(null, "缺少 key");
+        if (bas.Length == 0) return new ModelsOutcome(null, L.T("gen.noBaseUrl"));
+        if (key.Length == 0) return new ModelsOutcome(null, L.T("gen.noKey"));
 
         var modelsUrl = bas.EndsWith("/v1") ? bas + "/models" : bas + "/v1/models";
-        var (ok, status, body) = await Http.GetJsonAsync(modelsUrl,
+        var (ok, status, body, why) = await Http.GetJsonAsync(modelsUrl,
             new Dictionary<string, string>
             {
                 ["Authorization"] = $"Bearer {key}",
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return new ModelsOutcome(null, "网络错误: 网络异常");
-        if (status is 401 or 403) return new ModelsOutcome(null, $"key 无效 (HTTP {status})");
-        if (status == 404) return new ModelsOutcome(null, "该 provider 无 /v1/models 端点");
+        if (!ok) return new ModelsOutcome(null, Http.NetErrText(why));
+        if (status is 401 or 403) return new ModelsOutcome(null, L.F("pr.keyInvalid", status));
+        if (status == 404) return new ModelsOutcome(null, L.T("gen.noModels"));
         if (status != 200) return new ModelsOutcome(null, $"HTTP {status}");
 
         JsonElement raw;
@@ -183,7 +184,7 @@ public static class GenericOpenAi
         else
             raw = body;
         if (raw.ValueKind != JsonValueKind.Array)
-            return new ModelsOutcome(null, "响应结构未识别");
+            return new ModelsOutcome(null, L.T("pr.structUnknown"));
 
         var models = new List<string>();
         foreach (var item in raw.EnumerateArray())
@@ -212,7 +213,7 @@ public static class GenericOpenAi
             Total = granted,
             Unit = "$",
             Pct = granted > 0 ? available / granted * 100 : null,
-            Detail = $"已用 ${Http.F2(used)} · 总额 ${Http.F2(granted)}",
+            Detail = L.F("gen.detailUsedTotal", Http.F2(used), Http.F2(granted)),
             IsEstimate = false,
         };
     }
@@ -234,7 +235,7 @@ public static class GenericOpenAi
             Total = limit,
             Unit = "$",
             Pct = remaining / limit * 100,
-            Detail = $"已用 ${Http.F2(used)} · 额度 ${Http.F2(limit)}",
+            Detail = L.F("gen.detailUsedTotal", Http.F2(used), Http.F2(limit)),
             IsEstimate = false,
         };
     }
@@ -258,7 +259,7 @@ public static class GenericOpenAi
             Total = null,
             Unit = sym,
             Pct = null,
-            Detail = $"赠金 {sym}{Http.F2(granted)} · 充值 {sym}{Http.F2(topped)}",
+            Detail = L.F("pr.detailGranted", sym, Http.F2(granted), sym, Http.F2(topped)),
             IsEstimate = false,
         };
     }
@@ -284,7 +285,7 @@ public static class GenericOpenAi
             Total = total,
             Unit = "$",
             Pct = total > 0 ? remaining / total * 100 : null,
-            Detail = $"剩余 ${Http.F2(remaining)} · 已用 ${Http.F2(usedUsd)}",
+            Detail = L.F("pr.detailRemainUsd", Http.F2(remaining), Http.F2(usedUsd)),
             IsEstimate = false,
         };
     }

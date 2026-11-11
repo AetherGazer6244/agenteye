@@ -45,6 +45,8 @@ public sealed class AppServices
             // 配置不可用(读锁等):按空配置跑,禁止任何写盘,等用户处理
             Cfg = ConfigStore.Template();
         }
+        // 代理模式启动注入(Core.Http 静态属性,零 UI 依赖)
+        Http.Mode = Http.ParseMode(ProxyModeChoice);
         Poller = new PollerService(this);
         Notify = new NotifyService();
         Update = new UpdateService(this);
@@ -93,6 +95,23 @@ public sealed class AppServices
     {
         var ui = UiDict();
         ui["theme"] = choice;
+    }
+
+    /// <summary>
+    /// 代理模式(ui.proxy_mode):direct=直连优先,连不上才回退系统代理(缺省)/
+    /// auto=跟随系统代理(代理优先)/ system=严格跟随不做兜底。ui 自由字典加键,
+    /// schema_version 仍为 2,Python 版 merge 会保留未知键。
+    /// </summary>
+    public string ProxyModeChoice =>
+        Cfg.TryGetValue("ui", out var u) && u is Dictionary<string, object?> ui &&
+        ui.TryGetValue("proxy_mode", out var pm) && pm is string pms && pms.Length > 0
+            ? pms : "direct";
+
+    public void SetProxyMode(string mode)
+    {
+        UiDict()["proxy_mode"] = mode;
+        Http.Mode = Http.ParseMode(mode);
+        Http.ResetProxyState(); // 别让旧的「代理疑似不可用」记忆污染新模式
     }
 
     /// <summary>
@@ -145,6 +164,37 @@ public sealed class AppServices
     }
 
     public void SetAutostart(bool enabled) => UiDict()["autostart"] = enabled;
+
+    /// <summary>
+    /// 关主窗行为(ui.close_to_tray):true = 点 X 隐藏进托盘(默认,进程/托盘存活),
+    /// false = 点 X 直接退出(1.3 及以前的行为)。托盘菜单"退出"与更新安装不受影响。
+    /// </summary>
+    public bool CloseToTray
+    {
+        get
+        {
+            var ui = UiDict();
+            if (ui.TryGetValue("close_to_tray", out var c) && c is bool b) return b;
+            return true;
+        }
+    }
+
+    public void SetCloseToTray(bool enabled) => UiDict()["close_to_tray"] = enabled;
+
+    /// <summary>
+    /// 自适应轮询(ui.adaptive_poll,1.6.0):有 critical 行时间隔减半(下限 30s)、
+    /// 持续失败指数退避、全正常放缓 ×1.5。缺省关(保持固定周期)。
+    /// </summary>
+    public bool AdaptivePoll
+    {
+        get
+        {
+            var ui = UiDict();
+            return ui.TryGetValue("adaptive_poll", out var v) && v is true;
+        }
+    }
+
+    public void SetAdaptivePoll(bool enabled) => UiDict()["adaptive_poll"] = enabled;
 
     /// <summary>界面语言(ui.language);1.3.0 起支持中英切换。</summary>
     public string Language

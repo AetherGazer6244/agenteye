@@ -1,5 +1,6 @@
 using AgentEye.Core.Cache;
 using AgentEye.Core.Config;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -27,6 +28,9 @@ public static class ProviderRegistry
             ["deepseek"] = DeepSeekProvider.FetchAsync,
             ["zhipu"] = ZhipuProvider.FetchAsync,
             ["generic_openai"] = GenericOpenAi.FetchAsync,
+            // 1.6.0 新增
+            ["siliconflow"] = SiliconFlowProvider.FetchAsync,
+            ["openrouter"] = OpenRouterProvider.FetchAsync,
         };
 
     /// <summary>占位 key 文本等同于没填。</summary>
@@ -71,7 +75,7 @@ public static class ProviderRegistry
     private static ProviderResult Paused(string kind, Dictionary<string, object?> entry)
     {
         var res = BlankResult(kind, entry);
-        res.Detail = "已暂停轮询";
+        res.Detail = L.T("reg.paused");
         res.Paused = true;
         res.Level = Levels.Paused;
         return res;
@@ -80,7 +84,7 @@ public static class ProviderRegistry
     private static ProviderResult Cancelled(string kind, Dictionary<string, object?> entry)
     {
         var res = BlankResult(kind, entry);
-        res.Detail = "已退出,本轮未拉取";
+        res.Detail = L.T("reg.skippedRound");
         res.Level = Levels.Paused;
         return res;
     }
@@ -97,7 +101,7 @@ public static class ProviderRegistry
             return key;
         var resolved = ConfigStore.PlainKey(entry);
         if (resolved.Length == 0)
-            throw new KeyDecryptError("key_enc 解密失败,请在设置里重新填写 key");
+            throw new KeyDecryptError(L.T("reg.keyDecrypt"));
         return resolved;
     }
 
@@ -153,14 +157,14 @@ public static class ProviderRegistry
         if (PlaceholderKeys.Contains(key)) key = "";
         if (key.Length == 0 && !loginCreds)
         {
-            result.Error = "未配置 key";
+            result.Error = L.T("reg.noKey");
             result.Unconfigured = true;
             result.Level = Levels.Unconfigured;
             return result;
         }
         if (!Adapters.TryGetValue(kind, out var adapter))
         {
-            result.Error = $"未知 provider kind: {kind}";
+            result.Error = L.F("reg.unknownKind", kind);
             result.Level = Levels.Error;
             return result;
         }
@@ -242,16 +246,19 @@ public static class ProviderRegistry
         {
             var name = e.Entry.TryGetValue("name", out var n) && n is string ns ? ns : "";
             return byName.TryGetValue(name, out var r) ? r : Failed(e.Kind, e.Entry,
-                new InvalidOperationException("拉取任务未返回结果"));
+                new InvalidOperationException(L.T("reg.noResult")));
         }).ToList();
     }
 
     /// <summary>
     /// 阈值判定(端口自 _level):
     /// - ¥ 绝对额:alert.critical_amount_yuan(默认 5.0),剩余低于它 = critical
+    /// - $ 绝对额(1.6.0,仅无 pct 的行):alert.critical_amount_usd(默认 2.0)。
+    ///   此前「无 pct 的 $ 行」永远 ok(缺口);OpenRouter 这类纯金额行接进来后补上。
+    ///   带 Pct 守卫:opencode_go 等「$ + pct 双字段」行维持原 pct 路径。
     /// - 有 pct 的(不论 unit):按 alert.warn_pct(默认 30)判定,低于 = warn。
     ///   不按 unit 白名单过滤——美元计额的 provider 才是主要监控对象。
-    /// - 拿不到 pct 的(只报绝对金额的 $ provider):保持 ok
+    /// - 拿不到 pct、又没有 ¥/$ 剩余的行:保持 ok
     /// </summary>
     public static string ComputeLevel(
         ProviderResult res, Dictionary<string, object?> entry,
@@ -266,6 +273,12 @@ public static class ProviderRegistry
             var crit = Num(alert.TryGetValue("critical_amount_yuan", out var c) ? c : null, 5.0);
             if (res.Remaining is null) return Levels.Ok;
             return res.Remaining <= crit ? Levels.Critical : Levels.Ok;
+        }
+        if (res.Unit == "$" && res.Pct is null)
+        {
+            if (res.Remaining is null) return Levels.Ok;
+            var critUsd = Num(alert.TryGetValue("critical_amount_usd", out var cu) ? cu : null, 2.0);
+            return res.Remaining <= critUsd ? Levels.Critical : Levels.Ok;
         }
         if (res.Pct is not null)
         {

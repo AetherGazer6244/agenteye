@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 
 namespace AgentEye.Core.Update;
@@ -53,7 +54,7 @@ public sealed record UpdateCheckResult(
 public static class UpdateChecker
 {
     /// <summary>更新源仓库(公开仓库,匿名 API 即可)。</summary>
-    public const string Owner = "Cecilian-Elysian";
+    public const string Owner = "AetherGazer6244";
     public const string Repo = "AgentEye";
 
     /// <summary>安装包资产名匹配模式:AgentEye_Setup.exe(Inno Setup 安装器)。</summary>
@@ -91,24 +92,24 @@ public static class UpdateChecker
             ["X-GitHub-Api-Version"] = "2022-11-28",
         };
 
-        var (ok, status, body) = await Http.GetJsonAsync(url, headers, TimeoutSec, ct);
+        var (ok, status, body, why) = await Http.GetJsonAsync(url, headers, TimeoutSec, ct);
         if (!ok)
             return new UpdateCheckResult(UpdateCheckStatus.NetworkError, null,
-                "连不上 GitHub,检查更新失败(网络问题)");
+                Http.WithReason(L.T("upd.net"), why));
         if (status == 404)
             return new UpdateCheckResult(UpdateCheckStatus.NoRelease, null,
-                "仓库还没有发布版本,暂时无法检查更新");
+                L.T("upd.noReleases"));
         if (status == 403 || status == 429)
             return new UpdateCheckResult(UpdateCheckStatus.RateLimited, null,
-                "GitHub 接口限流(未登录每小时 60 次),稍后再试");
+                L.T("upd.ratelimit"));
         if (status != 200)
             return new UpdateCheckResult(UpdateCheckStatus.InvalidResponse, null,
-                $"GitHub 返回 HTTP {status}");
+                L.F("upd.http", status));
 
         var release = ParseRelease(body);
         if (release is null)
             return new UpdateCheckResult(UpdateCheckStatus.InvalidResponse, null,
-                "GitHub 返回的内容不是预期的 release 格式");
+                L.T("upd.badFormat"));
 
         return Decide(currentVersion, release);
     }
@@ -183,15 +184,15 @@ public static class UpdateChecker
         var latest = AppVersionInfo.Parse(release.VersionText);
         if (current is null || latest is null)
             return new UpdateCheckResult(UpdateCheckStatus.InvalidResponse, release,
-                $"版本号无法比较(当前 {currentVersion},远端 {release.Tag})");
+                L.F("upd.verCompare", currentVersion, release.Tag));
         if (!latest.IsNewerThan(current))
             return new UpdateCheckResult(UpdateCheckStatus.UpToDate, release,
-                $"已是最新版本 v{current}");
+                L.F("upd.upToDate", current));
         var asset = SelectAsset(release.Assets);
         if (asset is null)
             return new UpdateCheckResult(UpdateCheckStatus.NoAsset, release,
-                $"发现新版本 v{latest},但 release 里没有 {AssetNameHint} 安装包");
+                L.F("upd.noAsset", latest, AssetNameHint));
         return new UpdateCheckResult(UpdateCheckStatus.NewVersion, release,
-            $"发现新版本 v{latest}(当前 v{current})");
+            L.F("upd.found", latest, current));
     }
 }

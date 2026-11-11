@@ -49,7 +49,15 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 ## 安装器契约(AgentEye_Setup.iss)
 
 - `AppId=AgentEye` 显式写死——升级链依赖它稳定,改名即断链。
-- `DefaultDirName=E:\AgentEye` + `DisableDirPage=auto`(升级沿用旧目录)。
+- `DefaultDirName=E:\AgentEye` + `DisableDirPage=no`:每次安装都显示目录页,
+  升级预填旧目录(`UsePreviousAppDir=yes`)并允许修改;静默升级
+  (`/VERYSILENT`,应用内更新)不走向导,仍按旧目录覆盖。
+- `AppendDefaultDirName=no`:选目录后不再自动拼 `\AgentEye`(选哪装哪),
+  **同时让浏览对话框出现「新建文件夹」按钮**——设 `yes` 时该按钮不出现
+  (Inno 文档明确)。配套 `[Code]` 拦驱动器根目录,防止把文件撒在 `E:\`。
+- 快捷方式可选:`desktopicon` / `startmenuicon` 两个任务,`checkedonce`
+  (首装默认勾、升级记住上次选择);不勾开始菜单时整组不建,卸载入口仍在
+  系统设置「应用」。桌面用 `{userdesktop}`(非管理员写不进 Public Desktop)。
 - `PrivilegesRequired=lowest`,HKCU 注册表,无需管理员。
 - `CloseApplications=yes` + `RestartApplications=yes`:静默升级时安装器经
   Restart Manager 关掉运行中的应用、装完自动重启——**应用内更新靠这一对**,
@@ -100,9 +108,10 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 
 ## 图标资源契约
 
-- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(A 标 + 瞳孔,
-  托盘蓝 #285A96),16/20/24/32/40/48/64/128/256 九档、**32bpp BMP
-  条目**(不能改成 PNG 压缩条目——Inno 的 `SetupIconFile` 吃不下)。
+- 唯一图标源:`src\AgentEye.WinUI\Assets\AgentEye.ico`(字母 A:
+  实心窄高 A,托盘蓝 #285A96,无瞳孔、无底板),
+  16/20/24/32/40/48/64/128/256 九档、**32bpp BMP 条目**(不能改成 PNG 压缩
+  条目——Inno 的 `SetupIconFile` 吃不下)。
   由 `tools\make_icon.py` 生成(Pillow,dev-only,不在构建流程里);
   要改样式先改脚本再重生成,别手改 .ico。
 - 同一份文件三处用:csproj `ApplicationIcon` 内嵌进 exe(资源管理器/
@@ -118,8 +127,36 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
 - **GDI COLORREF 必须是 `0x00BBGGRR`**:高字节非 0 时 GDI 直接拒画,
   一个像素都不落——旧托盘代码就是栽在这(`0xFF000000 | ...`),
   托盘图标一直是空的,别再写错。
+- **Shell 结构体不许随手 `Pack=2`**:`NOTIFYICONDATAW` 带 `Pack=2` 时
+  x64 的 8 字节 hWnd/hIcon 被压到 4 字节对齐(hWnd@4,原生在 @8),
+  `NIM_ADD` 必然失败且被增强面吞掉 → 托盘永远无图标、无报错
+  (1.4.1 实测踩坑);用 Default pack(实测 Size=952 / hWnd@8 /
+  hIcon@32,与原生 x64 布局逐字段吻合)。
 - 上面的「图标字形用 Segoe Fluent Icons」只约束**界面内按钮**,
   不含 app 级 .ico 资源。
+
+## 本地化契约(1.3.0 起)
+
+- 唯一文案源是 `Core/Localization/L.cs`:zh / en 两本内置字典,
+  `L.T(key)` 直取、`L.F(key, args..)` 格式化;**新增界面文案必须
+  zh / en 双键同时给**,漏一边会被
+  `LocalizationTests.Zh_And_En_Dictionaries_Stay_In_Sync` 拦下。
+- 语言在启动时定型:App ctor 读 config `ui.language`(默认
+  "zh-Hans")→ `L.Init()` 一次,**运行期不变,切换重启生效**;
+  设置页「语言」行只负责保存 + 弹窗问是否立即重启。
+- **不许走 resw/x:Uid/PrimaryLanguageOverride**:解包形态下
+  `PrimaryLanguageOverride` 抛 `InvalidOperationException`(实测,
+  连 App ctor 里都抛),resw 方案已证伪并删除;XAML 静态文本用
+  `x:Name` + 代码 `L.T` 回填(如 SettingsPage.ApplyStrings)。
+- 静态数组/字典初始化器里**不许放文案**(类型初始化可能早于
+  `L.Init`),存键名、用时 `L.T` 解析(Detect/OpenCodeGo/Zhipu
+  都是这么改的)。
+- 范围:只翻"流向 UI"的文案;纯日志与内部异常保持中文。
+  `PlaceholderKeys`(provider 占位 key 文本)是 config 兼容标记,
+  不是 UI 文案,**不许本地化**。
+- 测试默认 zh:`L.Lang` 是进程级静态态,en 用例必须 try/finally
+  还原 `L.Init("zh-Hans")`,否则污染同进程其它用例(现有 130 条
+  断言全按 zh 文案写)。
 
 ## 中文文件
 
@@ -146,6 +183,18 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   `schema_version` 仍是 2,Python 版 merge 会保留未知键,不受影响。
 - 开机自启:`ui.autostart` 只是镜像值,**真实状态以注册表为准**;
   `ui.language`(默认 "zh-Hans")1.2.1 只落库不切换,中英双语 1.3.0 起生效。
+- 关窗行为:`ui.close_to_tray`(缺省 true = X 隐藏进托盘,false = X 直接
+  退出);启动时 `StartupService.EnsureCurrent()` 自愈注册表旧路径,
+  镜像值以注册表为准回填。
+- 代理模式:`ui.proxy_mode`(缺省 "direct" = 直连优先,直连网络层失败才
+  回退系统代理;auto = 跟随系统代理,代理优先失败才直连;system = 严格
+  跟随不做兜底)。ui 自由字典加键,schema_version 仍为 2,Python 版
+  merge 保留未知键。刚失败过的路线记进程内(10 分钟窗口,`Http.Status`,
+  下轮把它挪到尝试顺序末尾省掉注定失败的尝试;该路走通即解除),**不出
+  任何横幅/通知**;设置页切模式即时生效并立即刷一轮。代理地址问
+  `HttpClient.DefaultProxy.GetProxy` 拿,不自己读注册表(.NET 8 的
+  DefaultProxy 是进程级快照,.NET 9 起才监听注册表变化——别依赖运行期
+  系统代理变更被自动看见)。
 
 ## 设置页版式契约(卡片行模板)
 
@@ -181,6 +230,21 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   直接拒绝。
 - 组合被别的程序占用(1409)只落 `HotkeyService.Status` 文案,设置页**弹窗**提示,
   应用照常运行——不许因此崩主流程(增强面契约)。
+- **失败判定看状态枚举,不看文案前缀**(`HotkeyService.State` /
+  `HotkeyState`):`Invalid` / `InUse` / `RegError` / `ServiceDown` /
+  `NoResponse` / `Timeout` / `ApplyFailed` 都算失败,一律走弹窗,成功静默。
+  **`Unknown` 不算失败**:热键服务是在 `Root_Loaded` 里后建的,页面初始化
+  早于它,那时 `_hotkey` 还是 null——1.5.3 首版把 null 当成"服务不可用",
+  结果每次启动都误弹「快捷键未生效」(已修:null/未装配 = Unknown = 无错)。
+  旧的 `hotkey.regFailPrefix` 文案前缀判定已删(只覆盖了「注册失败」一种,
+  服务异常全静默)。
+- `RegisterHotKey` 的 P/Invoke **必须带 `SetLastError=true`**:不带的话
+  `Marshal.GetLastWin32Error()` 拿到的是 CLR 内部垃圾值(实测 -130988),
+  1409「组合被占用」这条友好文案永远走不到,用户看到的是「注册失败(错误
+  -130988)」这种怪码(1.5.3 修)。
+- 弹窗时机:设置页每次切到时弹一次(**同一失败状态只弹一次**,恢复后下次
+  再犯才再弹);启动时热键就没生效也弹一次(`MainWindow.ShowHotkeyWarningAsync`),
+  但**开机自启的静默启动(`--minimized`)不弹**——别在开机时打扰用户。
 - 设置页「录制」:文本框既可手打(解析器大小写不敏感),也可**直接按组合键**
   录入——但只有"输入框内容仍是已保存的值"时按键才算录入,用户一旦手动改字
   就交回输入框(否则打 "+" 会被误判成组合)。**WinUI 的 `KeyRoutedEventArgs`
@@ -188,9 +252,35 @@ dotnet test tests\AgentEye.Core.Tests -v q --nologo      # 130 passed
   提示并回滚,不写坏值。
 - 唤醒语义:托盘左键 / 小组件点击 = 总是拉回前台(`MainWindow.WakeUp()`);
   **热键 = 唤醒/隐藏切换**(`MainWindow.TogglePanel()`):面板在前台就
-  `AppWindow.Hide()` 藏回托盘,否则拉回前台。隐藏 ≠ 退出(托盘/轮询继续),
-  关主窗 X 仍是退出。热键不给前台权,`SetForegroundWindow` 被拒时借前台线程
+  `AppWindow.Hide()` 藏回托盘,否则拉回前台。隐藏 ≠ 退出(托盘/轮询继续);
+  **关主窗 X 由 `ui.close_to_tray` 决定**(1.4.1 起,缺省 true = 拦截
+  `AppWindow.Closing` 隐藏进托盘;false = 旧行为直接退出)。真退出只有
+  三条路:托盘菜单「退出」(`ExitFromTray`)、更新安装(安装器先置位
+  `MainWindow.CloseAllowedByUpdate` 放行 Restart Manager)、开关关掉后的 X。
+  热键不给前台权,`SetForegroundWindow` 被拒时借前台线程
   (`AttachThreadInput`)再试。
+
+## 单实例契约(1.5.3 起)
+
+- 热键、托盘图标、小组件、轮询都是**进程级**的:第二个实例会去抢第一个的
+  全局热键(1409「该组合已被其它程序占用」),还会多出一份托盘/小组件/轮询。
+  所以**必须单实例**。
+- 机制在 `Services/SingleInstance.cs`(自建 Win32):命名互斥体
+  `Local\AgentEye.Singleton`(Local\ = 当前登录会话,跨用户不互斥)+
+  主实例的**隐藏**顶层窗口(类名前缀 `AgentEyeSingleton_`,从不 ShowWindow,
+  但 `EnumWindows` 能枚举到)。第二实例枚举窗口认出主实例 → 发
+  `WM_APP_ACTIVATE` → 自己退出。
+- **不用 WinAppSDK 的 `AppInstance.FindOrRegisterForKey`**:本项目是
+  unpackaged(`WindowsPackageType=None`),`RedirectActivationToAsync` 的
+  `Activated` 回调可靠性要实测;自建可控,也跟托盘/热键同一路子。
+- 第二实例必须在**建 MainWindow 之前**退出(`App.OnLaunched` 最前面判):
+  托盘/小组件/热键/轮询/配置写入一个都不碰。退出用 `Environment.Exit(0)`
+  (没建窗口,直接退干净)。
+- 静默启动(开机自启 `--minimized`)撞上已有实例 → 只让主实例保住托盘,
+  **不弹面板**(开机弹窗是打扰);普通启动 → 把面板叫到前台
+  (`MainWindow.ActivateFromSecondInstance` → `WakeUp()`)。
+- 互斥体/隐藏窗口建不起来 → 静默降级成多实例照常跑(增强面契约),
+  不许起不来。找不到主实例窗口时第二实例静默退出(宁可少开,也不双开)。
 
 ## 增强面降级
 

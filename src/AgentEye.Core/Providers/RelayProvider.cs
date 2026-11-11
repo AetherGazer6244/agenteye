@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -44,15 +45,15 @@ public static class RelayProvider
             if (TokenCache.TryGetValue(key, out var cached) && cached.Expiry > Http.Now())
                 return (cached.Token, null);
         }
-        var (ok, status, body) = await Http.PostJsonAsync(bas + LoginPath,
+        var (ok, status, body, why) = await Http.PostJsonAsync(bas + LoginPath,
             new Dictionary<string, object?> { ["email"] = email, ["password"] = password },
             Http.DefaultTimeoutSec, ct);
-        if (!ok) return (null, "网络异常");
+        if (!ok) return (null, Http.WithReason(L.T("rl.net"), why));
         if (status != 200) return (null, $"HTTP {status}");
         if (body is not { ValueKind: System.Text.Json.JsonValueKind.Object } b)
-            return (null, "响应非JSON");
+            return (null, L.T("pr.notJson"));
         var token = Http.Str(b, "access_token");
-        if (string.IsNullOrEmpty(token)) return (null, "响应无 access_token");
+        if (string.IsNullOrEmpty(token)) return (null, L.T("rl.noToken"));
         var ttl = Http.Num(b, "expires_in") ?? 3600;
         lock (TokenLock)
         {
@@ -69,7 +70,7 @@ public static class RelayProvider
         var email = e.Raw.TryGetValue("email", out var em) && em is string ems ? ems : "";
         var password = e.Raw.TryGetValue("password", out var pw) && pw is string pws ? pws : "";
         if (bas.Length == 0 || (token.Length == 0 && (email.Length == 0 || password.Length == 0)))
-            return FetchPayload.Err("未配置 base_url/token", unconfigured: true);
+            return FetchPayload.Err(L.T("rl.noCfg"), unconfigured: true);
 
         var extraHeaders = new Dictionary<string, string>();
         if (e.Raw.TryGetValue("headers", out var h) && h is Dictionary<string, object?> hd)
@@ -99,7 +100,7 @@ public static class RelayProvider
                     }
                     else
                     {
-                        return FetchPayload.Err($"登录失败: {err}");
+                        return FetchPayload.Err(L.F("rl.loginFailed", err));
                     }
                 }
                 else
@@ -120,11 +121,11 @@ public static class RelayProvider
             foreach (var (kind, path) in Candidates)
             {
                 if (useAccessToken && kind == "new_api") continue;
-                var (ok, status, body) = await Http.GetJsonAsync(
+                var (ok, status, body, why) = await Http.GetJsonAsync(
                     bas + path, headers, Http.DefaultTimeoutSec, ct);
                 if (!ok)
                 {
-                    errors.Add($"{path}: 网络异常");
+                    errors.Add(Http.WithReason(L.F("rl.pathNet", path), why));
                     continue;
                 }
                 if (status == 401 && useAccessToken && !relogged)
@@ -151,7 +152,7 @@ public static class RelayProvider
                 }
                 if (!Http.IsObj(body))
                 {
-                    errors.Add($"{path}: 非JSON");
+                    errors.Add(L.F("gen.labelNotJson", path));
                     continue;
                 }
                 var parsed = Parse(kind, body, e);
@@ -163,11 +164,11 @@ public static class RelayProvider
                     parsed.Detail = $"[{path}] {parsed.Detail ?? ""}".Trim();
                     return parsed;
                 }
-                errors.Add($"{path}: 结构未识别");
+                errors.Add(L.F("gen.labelStruct", path));
             }
             if (!loopBroken)
             {
-                if (saw401) return FetchPayload.Err("key 无效 (HTTP 401)");
+                if (saw401) return FetchPayload.Err(L.F("pr.keyInvalid", 401));
                 return FetchPayload.Err(string.Join("; ", errors.Take(3)));
             }
             // relogged → continue 外层 while
@@ -189,12 +190,12 @@ public static class RelayProvider
         if (!Http.IsObj(body)) return null;
         if (Http.Obj(body, "isValid") is { ValueKind: System.Text.Json.JsonValueKind.False })
             // 端点明确说 key 无效:直接给结论
-            return FetchPayload.Err("key 无效 (isValid=false)");
+            return FetchPayload.Err(L.T("rl.keyInvalidFlag"));
         var remainingRaw = Http.Num(body, "balance") ?? Http.Num(body, "remaining");
         if (remainingRaw is null) return null;
         var remaining = remainingRaw.Value;
         var unitField = (Http.Str(body, "unit") ?? "USD").ToUpperInvariant();
-        var sym = unitField.Contains("USD") ? "$" : unitField.Contains("CNY") ? "¥" : "额度";
+        var sym = unitField.Contains("USD") ? "$" : unitField.Contains("CNY") ? "¥" : L.T("rl.unitFallback");
         var usage = Http.Obj(body, "usage") is { ValueKind: System.Text.Json.JsonValueKind.Object }
             ? Http.Obj(body, "usage")!.Value : default;
         var today = Http.Obj(usage, "today") is { ValueKind: System.Text.Json.JsonValueKind.Object }
@@ -206,15 +207,15 @@ public static class RelayProvider
         if (hasToday)
         {
             var cost = Http.Num(today, "actual_cost") ?? Http.Num(today, "cost");
-            if (cost is not null) parts.Add($"今日 {sym}{Http.F2(cost.Value)}");
+            if (cost is not null) parts.Add(L.F("rl.today", sym, Http.F2(cost.Value)));
             if (Http.Num(today, "requests") is { } reqs)
-                parts.Add($"{(long)reqs} 次");
+                parts.Add(L.F("rl.reqs", (long)reqs));
         }
         double? used = null;
         if (Http.IsObj(total))
         {
             used = Http.Num(total, "actual_cost") ?? Http.Num(total, "cost");
-            if (used is not null) parts.Add($"累计实付 {sym}{Http.F2(used.Value)}");
+            if (used is not null) parts.Add(L.F("rl.paidTotal", sym, Http.F2(used.Value)));
         }
         double? usedToday = null;
         if (hasToday)
@@ -260,7 +261,7 @@ public static class RelayProvider
             Total = total,
             Unit = "$",
             Pct = total > 0 ? remaining / total * 100 : null,
-            Detail = $"剩余 ${Http.F2(remaining)} · 已用 ${Http.F2(usedUsd)}",
+            Detail = L.F("pr.detailRemainUsd", Http.F2(remaining), Http.F2(usedUsd)),
             IsEstimate = false,
         };
     }
@@ -293,12 +294,12 @@ public static class RelayProvider
             const string unit = "$";
             string detail;
             if (sumTotal > 0)
-                detail = $"剩余 ${Http.N2(sumRemaining)}"
-                         + (keyCount > 1 ? $" · {keyCount} 个 key" : "")
-                         + $" · 总量 ${Http.N2(sumTotal)}";
+                detail = L.F("rl.sumRemainUsd", Http.N2(sumRemaining))
+                         + (keyCount > 1 ? L.F("rl.keyCount", keyCount) : "")
+                         + L.F("rl.sumTotalUsd", Http.N2(sumTotal));
             else
-                detail = $"剩余 ${Http.N2(sumRemaining)}"
-                         + (keyCount > 1 ? $" · {keyCount} 个 key" : "");
+                detail = L.F("rl.sumRemainUsd", Http.N2(sumRemaining))
+                         + (keyCount > 1 ? L.F("rl.keyCount", keyCount) : "");
             if (sumTotal > 0)
                 return new FetchPayload
                 {
@@ -314,10 +315,10 @@ public static class RelayProvider
             };
         }
         var unitRaw = e.Raw.TryGetValue("unit", out var u) && u is string us && us.Length > 0
-            ? us : "额度";
-        var detailPlain = $"剩余 {Http.N2(sumRemaining)}{unitRaw}";
-        if (keyCount > 1) detailPlain += $" · {keyCount} 个 key";
-        if (sumTotal > 0) detailPlain += $" · 总量 {Http.N2(sumTotal)}";
+            ? us : L.T("rl.unitFallback");
+        var detailPlain = L.F("rl.sumRemainRaw", Http.N2(sumRemaining), unitRaw);
+        if (keyCount > 1) detailPlain += L.F("rl.keyCount", keyCount);
+        if (sumTotal > 0) detailPlain += L.F("rl.sumTotalRaw", Http.N2(sumTotal));
         if (sumTotal > 0)
             return new FetchPayload
             {

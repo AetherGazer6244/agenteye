@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """AgentEye 应用图标生成器(dev-only)。
 
-设计:几何体字母 A(托盘蓝 #285A96)+ 三角形留白里的瞳孔圆点。
-坐标在 1024×1024 逻辑画布上定义,绘制时 4× 超采样再 LANCZOS 缩放,
-所以边缘平滑且不依赖任何字体。
+设计:只要字母 A——实心窄高 A(托盘蓝 #285A96),无瞳孔、无底板。
+字形 = 外三角实心 + 同底相似内三角挖空负形 + 横杠;坐标在 1024×1024
+逻辑画布上定义,绘制时 4× 超采样再 LANCZOS 缩放,边缘平滑且不依赖
+任何字体。托盘染色:整字都是 SrcBody 色,随额度紧张度整体换色。
 
 用法:
   python tools/make_icon.py --preview            # 出多尺寸预览拼版 PNG
-  python tools/make_icon.py --variant v1         # 生成正式 .ico
-  python tools/make_icon.py --variant v1 --out path.ico
+  python tools/make_icon.py --variant final      # 生成正式 .ico
+  python tools/make_icon.py --variant final --out path.ico
 """
 
 import argparse
+import math
 import os
 
 from PIL import Image, ImageDraw
@@ -20,13 +22,12 @@ SS = 4                      # 超采样倍数
 LOGICAL = 1024              # 逻辑画布边长
 ICO_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
 
-# 字母 A 的骨架(逻辑画布 1024):
-#   顶点 (512, apex_y),基线 y = base_y,基线左右端点 base_l / base_r
-# 定稿 = 窄高 A(腿薄、字面瘦)+ 横杠上方内切圆瞳孔(亮蓝,略下移),
-# 16px 时瞳孔仍有 1~2px,任务栏/标题栏能认出"眼"。
+# 字母 A 的骨架(逻辑画布 1024)——只要 A:
+#   外三角实心,同底相似内三角挖出中负形,横杠补回字面;
+#   定稿 = 窄高 A(腿薄、字面瘦),≤24px 用 small 变体(腿更粗、横杠更靠下)。
 VARIANTS = {
     "final": dict(
-        name="AgentEye 窄高 A + 亮蓝瞳孔",
+        name="AgentEye 字母 A(托盘蓝)",
         apex_y=95.0,
         base_y=925.0,
         base_l=205.0,
@@ -34,14 +35,11 @@ VARIANTS = {
         leg=104.0,           # 腿部水平厚度
         bar_top=622.0,       # 横杠上沿
         bar_bottom=756.0,    # 横杠下沿
-        pupil_ratio=1.0,     # 瞳孔占内切圆比例
-        pupil_dy=40.0,       # 瞳孔下移(视觉居中)
-        body="#285A96",      # 托盘蓝
-        pupil="#8FC4F2",
+        body="#285A96",      # 托盘蓝(TrayIconRenderer.SrcBody 同源)
     ),
     # 小尺寸专用:腿更粗、横杠更靠下,≤24px 时字面不至于糊成一团
     "small": dict(
-        name="AgentEye 窄高 A + 亮蓝瞳孔(小尺寸版)",
+        name="AgentEye 字母 A(小尺寸版)",
         apex_y=95.0,
         base_y=925.0,
         base_l=185.0,
@@ -49,10 +47,7 @@ VARIANTS = {
         leg=126.0,
         bar_top=632.0,
         bar_bottom=762.0,
-        pupil_ratio=1.0,
-        pupil_dy=30.0,
         body="#285A96",
-        pupil="#8FC4F2",
     ),
 }
 
@@ -90,28 +85,8 @@ def edge_x(y, inner, side):
     return rx + (ax - rx) * t
 
 
-def incenter(tri):
-    """三角形内心(等边权重)与内切半径。"""
-    (ax, ay), (bx, by), (cx, cy) = tri
-    a = ((bx - cx) ** 2 + (by - cy) ** 2) ** 0.5
-    b = ((cx - ax) ** 2 + (cy - ay) ** 2) ** 0.5
-    c = ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
-    p = a + b + c
-    x = (a * ax + b * bx + c * cx) / p
-    y = (a * ay + b * by + c * cy) / p
-    return (x, y), _dist_to_base(x, y, (bx, by), (cx, cy))
-
-
-def _dist_to_base(x, y, b, c):
-    (bx, by), (cx, cy) = b, c
-    dx, dy = cx - bx, cy - by
-    if dx == 0 and dy == 0:
-        return 0.0
-    return abs(dy * x - dx * y + cx * by - cy * bx) / (dx * dx + dy * dy) ** 0.5
-
-
 def build(v, size=LOGICAL, canvas=LOGICAL * SS):
-    """按超采样画布绘制,返回 (大图, 缩到 size 的图)。"""
+    """按超采样画布绘制字母 A,返回 (大图, 缩到 size 的图)。"""
     outer, inner = triangles(v)
     img = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -121,7 +96,7 @@ def build(v, size=LOGICAL, canvas=LOGICAL * SS):
         return [(x * k, y * k) for (x, y) in pts]
 
     body = rgb(v["body"])
-    d.polygon(sc(outer), fill=body)                 # 整块实心
+    d.polygon(sc(outer), fill=body)                  # 整块实心
     d.polygon(sc(inner), fill=(0, 0, 0, 0))          # 挖出内三角(A 的中空)
 
     bt, bb = v["bar_top"], v["bar_bottom"]
@@ -132,15 +107,6 @@ def build(v, size=LOGICAL, canvas=LOGICAL * SS):
         (edge_x(bb, inner, "l"), bb),
     ]
     d.polygon(sc(bar), fill=body)                    # 横杠
-
-    # 瞳孔:横杠上方三角形的内切圆
-    tri = [inner[0], (edge_x(bt, inner, "l"), bt), (edge_x(bt, inner, "r"), bt)]
-    (cx, cy), r = incenter(tri)
-    r *= v["pupil_ratio"]
-    cy += v.get("pupil_dy", 0.0)
-    k = canvas / LOGICAL
-    d.ellipse([(cx - r) * k, (cy - r) * k, (cx + r) * k, (cy + r) * k],
-              fill=rgb(v["pupil"]))
 
     return img, img.resize((size, size), Image.LANCZOS)
 

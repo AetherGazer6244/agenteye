@@ -118,9 +118,13 @@ public class LevelTests
     }
 
     [Fact]
-    public void NoPct_IsOk()
+    public void Usd_NoPct_BelowDefaultUsdThreshold_IsCritical()
     {
-        Assert.Equal(Levels.Ok, ProviderRegistry.ComputeLevel(Res("$", remaining: 1), new(), Cfg()));
+        // 1.6.0 起:无 pct 的 $ 行按 alert.critical_amount_usd(缺省 2.0)判
+        // critical。旧契约「永远 ok」是缺口(OpenRouter 等纯金额行接进来后补上)。
+        // ComputeLevel 对缺键的 alert 走内置缺省,这里给 "$1 剩余" 期望 critical。
+        Assert.Equal(Levels.Critical,
+            ProviderRegistry.ComputeLevel(Res("$", remaining: 1.0), new(), Cfg()));
     }
 
     [Fact]

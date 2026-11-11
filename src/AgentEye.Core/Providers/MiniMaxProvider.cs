@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using AgentEye.Core.Localization;
 
 namespace AgentEye.Core.Providers;
 
@@ -99,7 +100,7 @@ public static partial class MiniMaxProvider
     {
         var key = e.ApiKey ?? "";
         if (key.Length == 0)
-            return FetchPayload.Err("未配置 api_key", unconfigured: true);
+            return FetchPayload.Err(L.T("pr.noKey"), unconfigured: true);
 
         var plan = e.Raw.TryGetValue("plan", out var p) && p is string ps &&
                    (ps == "coding_plan" || ps == "token_plan")
@@ -108,16 +109,16 @@ public static partial class MiniMaxProvider
         var path = plan == "coding_plan" ? CodingPath : TokenPath;
         var url = Host(e) + path;
 
-        var (ok, status, body) = await Http.GetJsonAsync(url,
+        var (ok, status, body, why) = await Http.GetJsonAsync(url,
             new Dictionary<string, string>
             {
                 ["Authorization"] = $"Bearer {key}",
                 ["Accept"] = "application/json",
             }, Http.DefaultTimeoutSec, ct);
-        if (!ok) return FetchPayload.Err("网络错误: 网络异常");
-        if (status is 401 or 403) return FetchPayload.Err($"key 无效 (HTTP {status})");
+        if (!ok) return FetchPayload.Err(Http.NetErrText(why));
+        if (status is 401 or 403) return FetchPayload.Err(L.F("pr.keyInvalid", status));
         if (status != 200) return FetchPayload.Err($"HTTP {status}");
-        if (!Http.IsObj(body)) return FetchPayload.Err("响应非 JSON");
+        if (!Http.IsObj(body)) return FetchPayload.Err(L.T("pr.notJson"));
 
         // 接口级报错必须在解析 items 之前判:错误体里的残留字段会被当成
         // 正常数据。base_resp 偶尔回成非 dict(网关错误页),先收型再取。
@@ -128,11 +129,11 @@ public static partial class MiniMaxProvider
         if (statusCode is not null && statusCode != 0)
         {
             var msg = Http.Str(baseObj, "status_msg") ?? statusCode.ToString();
-            return FetchPayload.Err($"接口报错: {msg}");
+            return FetchPayload.Err(L.F("pr.apiError", msg));
         }
 
         var items = ExtractItems(body);
-        if (items is null) return FetchPayload.Err("响应结构未识别");
+        if (items is null) return FetchPayload.Err(L.T("pr.structUnknown"));
 
         var parsed = new List<Item>();
         var skipped = 0;
@@ -154,7 +155,7 @@ public static partial class MiniMaxProvider
         }
 
         if (parsed.Count == 0)
-            return FetchPayload.Err("套餐未启用或无可用额度项");
+            return FetchPayload.Err(L.T("mm.noQuota"));
 
         var headline = parsed.FirstOrDefault(p => p.Name.Contains("general", StringComparison.OrdinalIgnoreCase))
                        ?? parsed[0];
@@ -169,7 +170,7 @@ public static partial class MiniMaxProvider
         {
             var percents = parsed.Where(p => p.Interval is not null)
                 .Select(p => p.Interval!.Value).ToList();
-            if (percents.Count == 0) return FetchPayload.Err("无百分比字段");
+            if (percents.Count == 0) return FetchPayload.Err(L.T("mm.noPct"));
             pct = percents[0];
         }
 
@@ -184,7 +185,8 @@ public static partial class MiniMaxProvider
             {
                 try
                 {
-                    seg += $" {(long)it.TotalN - (long)(it.UsedN ?? 0)}/{(long)it.TotalN} 次";
+                    seg += L.F("mm.timesLeft",
+                        (long)it.TotalN - (long)(it.UsedN ?? 0), (long)it.TotalN);
                 }
                 catch
                 {
@@ -195,13 +197,13 @@ public static partial class MiniMaxProvider
             {
                 seg += $" 5h {Http.F0(it.Interval.Value)}%";
             }
-            if (it.Weekly is not null) seg += $" · 周 {Http.F0(it.Weekly.Value)}%";
+            if (it.Weekly is not null) seg += L.F("mm.weekly", Http.F0(it.Weekly.Value));
             parts.Add(seg);
         }
-        if (parsed.Count > 3) parts.Add($"…共{parsed.Count}个模型");
-        if (skipped > 0) parts.Add($"({skipped}项未启用)");
+        if (parsed.Count > 3) parts.Add(L.F("mm.moreModels", parsed.Count));
+        if (skipped > 0) parts.Add(L.F("mm.disabled", skipped));
         var detail = string.Join(" | ", parts);
-        if (headline.Reset is not null) detail += $" · 重置 {headline.Reset}";
+        if (headline.Reset is not null) detail += L.F("pr.reset", headline.Reset);
         detail = $"[{plan}] " + detail;
 
         return new FetchPayload

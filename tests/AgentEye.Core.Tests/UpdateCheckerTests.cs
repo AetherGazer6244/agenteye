@@ -15,7 +15,7 @@ public class UpdateCheckerTests
         {
           "tag_name": "v2.1.0",
           "name": "AgentEye 2.1.0",
-          "html_url": "https://github.com/Cecilian-Elysian/AgentEye/releases/tag/v2.1.0",
+          "html_url": "https://github.com/AetherGazer6244/AgentEye/releases/tag/v2.1.0",
           "body": "修复若干问题",
           "prerelease": false,
           "published_at": "2026-10-22T10:00:00Z",

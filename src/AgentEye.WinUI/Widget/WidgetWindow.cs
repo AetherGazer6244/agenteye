@@ -1,3 +1,4 @@
+using AgentEye.Core.Localization;
 using AgentEye.Core.Providers;
 using AgentEye.WinUI.Services;
 using Microsoft.UI;
@@ -12,7 +13,7 @@ namespace AgentEye.WinUI.Widget;
 
 /// <summary>
 /// 桌面小组件:无边框、置顶、不抢焦点(WS_EX_NOACTIVATE + WS_EX_TOOLWINDOW),
-/// Acrylic 背板 + 行内 2px 等级细条,高度按行数自适应(空态 260×64)。
+/// Acrylic 背板 + 行内 3px 等级细条,高度按行数自适应(空态 260×64)。
 /// 交互契约(端口自 Python ui/widget.py):
 /// - "点击 vs 拖动"在松手时判定,位移 < 4 px 视为点击唤起主面板
 /// - 松手落盘位置取事件请求坐标(AppWindow.Position 回显滞后一轮,不可信)
@@ -21,7 +22,7 @@ namespace AgentEye.WinUI.Widget;
 public sealed class WidgetWindow : IDisposable
 {
     private const double Width = 260, HeightEmpty = 64;
-    private const double RowHeight = 18;   // 行 15 + 细条 2 + 间隙 1
+    private const double RowHeight = 26;   // 行实测 ~23(Segoe UI Variable 行高偏大) + 行距摊 3,留裕量防裁切
 
     private readonly AppServices _app;
     private readonly MainWindow _main;
@@ -146,7 +147,7 @@ public sealed class WidgetWindow : IDisposable
 
     private void BuildContent()
     {
-        _root.Padding = new Thickness(10, 6, 10, 6);
+        _root.Padding = new Thickness(12, 8, 12, 8);
         _root.CornerRadius = new CornerRadius(8);
         _root.BorderThickness = new Thickness(1);
         RepaintChrome();
@@ -155,8 +156,9 @@ public sealed class WidgetWindow : IDisposable
         var title = new TextBlock
         {
             Text = "AgentEye",
-            FontSize = 10,
-            Opacity = 0.6,
+            FontSize = 11,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Opacity = 0.75,
         };
         stack.Children.Add(title);
         _rowsHost = new StackPanel { Spacing = 2 };
@@ -222,7 +224,7 @@ public sealed class WidgetWindow : IDisposable
         {
             host.Children.Add(new TextBlock
             {
-                Text = "未接入 provider",
+                Text = L.T("widget.empty"),
                 FontSize = 11,
                 Opacity = 0.6,
             });
@@ -233,7 +235,7 @@ public sealed class WidgetWindow : IDisposable
         {
             var h = shown.Count == 0
                 ? HeightEmpty
-                : 12 /*padding*/ + 13 /*title*/ + 4 /*gap*/ + shown.Count * RowHeight;
+                : 16 /*padding*/ + 15 /*title*/ + 4 /*gap*/ + shown.Count * RowHeight;
             _window.AppWindow.Resize(new SizeInt32((int)Width, (int)Math.Ceiling(h)));
         }
         catch { /* 增强面 */ }
@@ -253,24 +255,29 @@ public sealed class WidgetWindow : IDisposable
 
         var dot = new Ellipse
         {
-            Width = 7,
-            Height = 7,
+            Width = 6,
+            Height = 6,
             VerticalAlignment = VerticalAlignment.Center,
             Fill = levelBrush,
         };
         var name = new TextBlock
         {
             Text = r.Name,
-            FontSize = 11,
+            FontSize = 12,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center,
             MaxWidth = 140,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
+        // 值带等级色(暂停/未配置走灰),一眼分清松紧
+        var dimmed = r.Paused || r.Level is Levels.Unconfigured or Levels.Paused;
         var value = new TextBlock
         {
-            FontSize = 11,
+            FontSize = 12,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center,
-            Text = r.Level is Levels.Unconfigured ? "未配置"
+            Foreground = dimmed ? AeRes.Brush(_root, "AePausedBrush") : levelBrush,
+            Text = r.Level is Levels.Unconfigured ? L.T("ov.unconfigured")
                 : r.Pct is not null ? $"{r.Pct:F0}%"
                 : r.Remaining is not null ? $"{r.Remaining:F2} {r.Unit}"
                 : "-",
@@ -286,22 +293,22 @@ public sealed class WidgetWindow : IDisposable
         line.Children.Add(name);
         line.Children.Add(value);
 
-        // 行内 2px 等级细条(无 pct 时空轨,轨道带淡等级色)
+        // 行内 3px 等级细条(无 pct 时空轨,轨道带淡等级色)
         var bar = new ProgressBar
         {
-            Height = 2,
+            Height = 3,
             Minimum = 0,
             Maximum = 100,
-            CornerRadius = new CornerRadius(1),
+            CornerRadius = new CornerRadius(1.5),
             Foreground = levelBrush,
             Background = levelBrush is SolidColorBrush sc
                 ? new SolidColorBrush(Windows.UI.Color.FromArgb(
-                    48, sc.Color.R, sc.Color.G, sc.Color.B))
+                    28, sc.Color.R, sc.Color.G, sc.Color.B))
                 : levelBrush,
         };
         if (r.Pct is not null) bar.Value = Math.Clamp(r.Pct.Value, 0, 100);
 
-        return new StackPanel { Spacing = 1, Children = { line, bar } };
+        return new StackPanel { Spacing = 2, Children = { line, bar } };
     }
 
     // ------------------------------------------------------------------
