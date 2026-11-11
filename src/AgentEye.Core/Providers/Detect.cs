@@ -32,6 +32,9 @@ public static partial class Detect
             ("minimaxi.com", "minimax", "https://api.minimaxi.com", "det.urlMinimax"),
             ("minimax.cn", "minimax", "https://api.minimaxi.com", "det.urlMinimaxCn"),
             ("opencode.ai", "opencode_go", "https://opencode.ai", "det.urlOc"),
+            // 1.6.0 新增
+            ("siliconflow", "siliconflow", "https://api.siliconflow.cn", "det.urlSiliconflow"),
+            ("openrouter.ai", "openrouter", "https://openrouter.ai", "det.urlOpenrouter"),
         ];
 
     public static DetectOutcome Run(string key = "", string hintUrl = "")

@@ -67,6 +67,8 @@ public sealed partial class SettingsPage : UserControl
         new(L.T("kind.zhipu"), "zhipu"),
         new(L.T("kind.minimax"), "minimax"),
         new(L.T("kind.opencode_go"), "opencode_go"),
+        new(L.T("kind.siliconflow"), "siliconflow"),
+        new(L.T("kind.openrouter"), "openrouter"),
         new(L.T("kind.generic_openai"), "generic_openai"),
     ];
 
@@ -79,7 +81,8 @@ public sealed partial class SettingsPage : UserControl
     ];
 
     /// <summary>有官方默认端点的 kind(base_url 可留空,拉取层有 fallback)。</summary>
-    private static readonly string[] OfficialKinds = ["deepseek", "zhipu", "minimax", "opencode_go"];
+    private static readonly string[] OfficialKinds =
+        ["deepseek", "zhipu", "minimax", "opencode_go", "siliconflow", "openrouter"];
 
     /// <summary>静态文案回填(语言启动定型,重启生效;unpackaged 无 resw 可用)。</summary>
     private void ApplyStrings()

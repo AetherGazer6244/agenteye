@@ -28,6 +28,8 @@ public static class ProviderTest
                 "minimax" => await MiniMaxProvider.FetchAsync(entry, ct),
                 "opencode_go" => await OpenCodeGoProvider.FetchAsync(entry, ct),
                 "relay" => await RelayProvider.FetchAsync(entry, ct),
+                "siliconflow" => await SiliconFlowProvider.FetchAsync(entry, ct),
+                "openrouter" => await OpenRouterProvider.FetchAsync(entry, ct),
                 _ => await GenericOpenAi.FetchAsync(entry, ct),
             };
             if (payload.Error is not null)

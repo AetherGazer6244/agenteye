@@ -28,6 +28,9 @@ public static class ProviderRegistry
             ["deepseek"] = DeepSeekProvider.FetchAsync,
             ["zhipu"] = ZhipuProvider.FetchAsync,
             ["generic_openai"] = GenericOpenAi.FetchAsync,
+            // 1.6.0 新增
+            ["siliconflow"] = SiliconFlowProvider.FetchAsync,
+            ["openrouter"] = OpenRouterProvider.FetchAsync,
         };
 
     /// <summary>占位 key 文本等同于没填。</summary>
@@ -250,9 +253,12 @@ public static class ProviderRegistry
     /// <summary>
     /// 阈值判定(端口自 _level):
     /// - ¥ 绝对额:alert.critical_amount_yuan(默认 5.0),剩余低于它 = critical
+    /// - $ 绝对额(1.6.0,仅无 pct 的行):alert.critical_amount_usd(默认 2.0)。
+    ///   此前「无 pct 的 $ 行」永远 ok(缺口);OpenRouter 这类纯金额行接进来后补上。
+    ///   带 Pct 守卫:opencode_go 等「$ + pct 双字段」行维持原 pct 路径。
     /// - 有 pct 的(不论 unit):按 alert.warn_pct(默认 30)判定,低于 = warn。
     ///   不按 unit 白名单过滤——美元计额的 provider 才是主要监控对象。
-    /// - 拿不到 pct 的(只报绝对金额的 $ provider):保持 ok
+    /// - 拿不到 pct、又没有 ¥/$ 剩余的行:保持 ok
     /// </summary>
     public static string ComputeLevel(
         ProviderResult res, Dictionary<string, object?> entry,
@@ -267,6 +273,12 @@ public static class ProviderRegistry
             var crit = Num(alert.TryGetValue("critical_amount_yuan", out var c) ? c : null, 5.0);
             if (res.Remaining is null) return Levels.Ok;
             return res.Remaining <= crit ? Levels.Critical : Levels.Ok;
+        }
+        if (res.Unit == "$" && res.Pct is null)
+        {
+            if (res.Remaining is null) return Levels.Ok;
+            var critUsd = Num(alert.TryGetValue("critical_amount_usd", out var cu) ? cu : null, 2.0);
+            return res.Remaining <= critUsd ? Levels.Critical : Levels.Ok;
         }
         if (res.Pct is not null)
         {

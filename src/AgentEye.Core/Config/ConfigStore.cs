@@ -35,6 +35,8 @@ public sealed class ConfigStore
             ["opencode_go"] = "OPENCODE_GO_API_KEY",
             ["deepseek"] = "DEEPSEEK_API_KEY",
             ["zhipu"] = "ZHIPU_API_KEY",
+            ["siliconflow"] = "SILICONFLOW_API_KEY",
+            ["openrouter"] = "OPENROUTER_API_KEY",
         };
 
     private static readonly IReadOnlyDictionary<string, string> KindFromV1Key =
@@ -56,6 +58,9 @@ public sealed class ConfigStore
             ["deepseek"] = "https://api.deepseek.com",
             ["zhipu"] = "https://open.bigmodel.cn",
             ["generic_openai"] = "",
+            // 1.6.0 新增
+            ["siliconflow"] = "https://api.siliconflow.cn",
+            ["openrouter"] = "https://openrouter.ai",
         };
 
     /// <summary>官方端点的默认 base_url(拉取层对空 URL 有 fallback);没有则空串。</summary>
@@ -104,6 +109,8 @@ public sealed class ConfigStore
             ["enable"] = true,
             ["warn_pct"] = 30,
             ["critical_amount_yuan"] = 5.0,
+            // $ 绝对额阈值(1.6.0):无 pct 的 $ 行(OpenRouter 等)用它判 critical
+            ["critical_amount_usd"] = 2.0,
             // 免打扰时段(1.6.0):"HH:mm",空串 = 关闭;ui/alert 自由键,
             // schema_version 仍为 2,Python 版 merge 保留未知键
             ["quiet_start"] = "",

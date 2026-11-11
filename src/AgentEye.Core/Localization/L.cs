@@ -111,6 +111,8 @@ public static class L
         ["kind.zhipu"] = "智谱 GLM",
         ["kind.minimax"] = "MiniMax",
         ["kind.opencode_go"] = "OpenCode Go",
+        ["kind.siliconflow"] = "SiliconFlow(硅基流动)",
+        ["kind.openrouter"] = "OpenRouter",
         ["kind.generic_openai"] = "通用 OpenAI 兼容",
 
         // —— 设置页:高级 ——
@@ -273,7 +275,12 @@ public static class L
         ["pr.structUnknown"] = "响应结构未识别",
         ["pr.detailGranted"] = "赠金 {0}{1} · 充值 {2}{3}",
         ["pr.detailRemainUsd"] = "剩余 ${0} · 已用 ${1}",
+        ["pr.detailBalance"] = "余额 ¥{0}(总资产 ¥{1})",
         ["pr.reset"] = " · 重置 {0}",
+
+        // —— Core:SiliconFlow / OpenRouter ——
+        ["sf.noBalance"] = "可用余额为 0(免费账号或未充值)",
+        ["or.noBalance"] = "无额度记录(免费账号或未充值)",
 
         // —— Core:DeepSeek ——
         ["ds.noBalanceInfos"] = "响应无 balance_infos",
@@ -316,6 +323,8 @@ public static class L
         ["det.urlMinimax"] = "URL 含 'minimaxi.com' → MiniMax",
         ["det.urlMinimaxCn"] = "URL 含 'minimax.cn' → MiniMax",
         ["det.urlOc"] = "URL 含 'opencode.ai' → OpenCode Go",
+        ["det.urlSiliconflow"] = "URL 含 'siliconflow' → SiliconFlow(硅基流动)",
+        ["det.urlOpenrouter"] = "URL 含 'openrouter.ai' → OpenRouter",
         ["det.urlV1"] = "URL 含 '/v1' → 通用 OpenAI 兼容",
         ["det.fallbackGeneric"] = "未识别 URL,按通用 OpenAI 兼容处理",
         ["det.needMore"] = "未提供 key 与 URL,需要更多信息",
@@ -466,6 +475,8 @@ public static class L
         ["kind.zhipu"] = "Zhipu GLM",
         ["kind.minimax"] = "MiniMax",
         ["kind.opencode_go"] = "OpenCode Go",
+        ["kind.siliconflow"] = "SiliconFlow",
+        ["kind.openrouter"] = "OpenRouter",
         ["kind.generic_openai"] = "Generic OpenAI-compatible",
 
         // —— Settings: advanced ——
@@ -628,7 +639,12 @@ public static class L
         ["pr.structUnknown"] = "Unrecognized response structure",
         ["pr.detailGranted"] = "Granted {0}{1} · Topped up {2}{3}",
         ["pr.detailRemainUsd"] = "Remaining ${0} · Used ${1}",
+        ["pr.detailBalance"] = "Balance ¥{0} (total ¥{1})",
         ["pr.reset"] = " · resets {0}",
+
+        // —— Core: SiliconFlow / OpenRouter ——
+        ["sf.noBalance"] = "Balance is 0 (free account or not topped up)",
+        ["or.noBalance"] = "No credit record (free account or not topped up)",
 
         // —— Core: DeepSeek ——
         ["ds.noBalanceInfos"] = "Response has no balance_infos",
@@ -671,6 +687,8 @@ public static class L
         ["det.urlMinimax"] = "URL contains 'minimaxi.com' → MiniMax",
         ["det.urlMinimaxCn"] = "URL contains 'minimax.cn' → MiniMax",
         ["det.urlOc"] = "URL contains 'opencode.ai' → OpenCode Go",
+        ["det.urlSiliconflow"] = "URL contains 'siliconflow' → SiliconFlow",
+        ["det.urlOpenrouter"] = "URL contains 'openrouter.ai' → OpenRouter",
         ["det.urlV1"] = "URL contains '/v1' → generic OpenAI-compatible",
         ["det.fallbackGeneric"] = "URL not recognized; treating as generic OpenAI-compatible",
         ["det.needMore"] = "Neither key nor URL provided; more info needed",
