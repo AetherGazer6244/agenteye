@@ -181,6 +181,21 @@ public sealed class AppServices
 
     public void SetCloseToTray(bool enabled) => UiDict()["close_to_tray"] = enabled;
 
+    /// <summary>
+    /// 自适应轮询(ui.adaptive_poll,1.6.0):有 critical 行时间隔减半(下限 30s)、
+    /// 持续失败指数退避、全正常放缓 ×1.5。缺省关(保持固定周期)。
+    /// </summary>
+    public bool AdaptivePoll
+    {
+        get
+        {
+            var ui = UiDict();
+            return ui.TryGetValue("adaptive_poll", out var v) && v is true;
+        }
+    }
+
+    public void SetAdaptivePoll(bool enabled) => UiDict()["adaptive_poll"] = enabled;
+
     /// <summary>界面语言(ui.language);1.3.0 起支持中英切换。</summary>
     public string Language
     {

@@ -118,6 +118,8 @@ public sealed class ConfigStore
             ["hotkey"] = HotkeySpec.DefaultText, ["hotkey_enabled"] = true,
             // 开机自启动(应用侧写 HKCU Run)+ 界面语言(1.3.0 起支持中英切换)
             ["autostart"] = false, ["language"] = "zh-Hans",
+            // 自适应轮询(1.6.0):紧张时加密/持续失败退避;缺省关
+            ["adaptive_poll"] = false,
         },
         ["providers"] = new List<object?>(),
     };

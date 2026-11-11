@@ -370,6 +370,31 @@
                 </StackPanel>
             </Border>
 
+            <!-- 自适应轮询(1.6.0):紧张时加密/持续失败退避 -->
+            <Border Style="{StaticResource AeSettingsItemStyle}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource AeSettingsIconPlateStyle}">
+                        <FontIcon Style="{StaticResource AeSettingsIconGlyphStyle}"
+                                  Glyph="&#xE945;" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtAdaptiveTitle"
+                                   Style="{StaticResource AeSettingsItemTitleStyle}" />
+                        <TextBlock x:Name="TxtAdaptiveSub"
+                                   Style="{StaticResource AeSettingsItemSubtitleStyle}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AdaptiveSwitch" Grid.Column="2"
+                                  MinWidth="0" VerticalAlignment="Center"
+                                  Toggled="AdaptiveSwitch_Toggled" />
+                </Grid>
+            </Border>
+
             <!-- 关于软件 -->
             <TextBlock x:Name="SecAbout" Style="{StaticResource AeSectionHeaderStyle}" />
 

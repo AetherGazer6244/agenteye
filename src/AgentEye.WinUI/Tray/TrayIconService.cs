@@ -285,12 +285,29 @@ public sealed class TrayIconService : IDisposable
         if (worst is null)
             return ("··", "empty", L.T("tray.tooltipEmpty"));
         if (worst.Level is Levels.Unconfigured or Levels.Error or Levels.Paused)
-            return ("!", $"{worst.Name}|{worst.Level}", L.F("tray.tooltipLevel", worst.Name, worst.Level));
-        var used = worst.Pct is null ? 0 : (int)Math.Round(100 - worst.Pct.Value);
+            return ("!", $"{worst.Name}|{worst.Level}",
+                L.F("tray.tooltipLevel", worst.Name, LevelText(worst.Level)));
+        // 没有 pct 的金额行($ 剩余):画 neutral 点串,tooltip 给等级名,
+        // 别硬凑「已用 0%」误导
+        if (worst.Pct is null)
+            return ("··", $"{worst.Name}|np",
+                L.F("tray.tooltipLevel", worst.Name, LevelText(worst.Level)));
+        var used = (int)Math.Round(100 - worst.Pct.Value);
         used = Math.Clamp(used, 0, 100);
         return (used.ToString(), $"{worst.Name}|{used}",
             L.F("tray.tooltipWorst", worst.Name, used));
     }
+
+    /// <summary>等级 → 本地化短名(tooltip 用;错误行不该露出英文内部枚举名)。</summary>
+    private static string LevelText(string level) => level switch
+    {
+        Levels.Ok => L.T("ov.level.ok"),
+        Levels.Warn => L.T("ov.level.warn"),
+        Levels.Critical => L.T("ov.level.critical"),
+        Levels.Unconfigured => L.T("ov.unconfigured"),
+        Levels.Paused => L.T("ov.paused"),
+        _ => L.T("ov.error"),
+    };
 
     /// <summary>托盘图标:应用 A 标 + 数字牌(渲染细节见 TrayIconRenderer)。</summary>
     private nint Draw(string digits)

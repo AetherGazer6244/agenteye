@@ -251,8 +251,11 @@ public sealed partial class OverviewPage : UserControl
 
         card.Child = stack;
 
-        // 行右键菜单(对齐 Python row_menu:暂停/编辑/删除)
+        // 行右键菜单:立即刷新(1.6.0 行级单刷)/ 暂停 / 编辑 / 删除
         var menu = new MenuFlyout();
+        var miRefresh = new MenuFlyoutItem { Text = L.T("ov.ctxRefresh") };
+        miRefresh.Click += (_, _) => _ = _app.Poller.RefreshProviderAsync(row.Name);
+        menu.Items.Add(miRefresh);
         var miPause = new MenuFlyoutItem
         { Text = _app.Paused.Contains(row.Name) ? L.T("ov.resume") : L.T("ov.pause") };
         miPause.Click += (_, _) => TogglePause(row.Name);

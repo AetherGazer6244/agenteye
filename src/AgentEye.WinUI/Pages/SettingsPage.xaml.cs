@@ -137,6 +137,10 @@ public sealed partial class SettingsPage : UserControl
         TxtWidthLabel.Text = L.T("adv.width");
         TxtHeightLabel.Text = L.T("adv.height");
         BtnResetSize.Content = L.T("adv.resetSize");
+        TxtAdaptiveTitle.Text = L.T("adv.adaptive.title");
+        TxtAdaptiveSub.Text = L.T("adv.adaptive.subtitle");
+        AdaptiveSwitch.OnContent = L.T("adv.adaptive.on");
+        AdaptiveSwitch.OffContent = L.T("adv.adaptive.off");
         SecAbout.Text = L.T("sec.about");
         TxtAboutTitle.Text = L.T("about.title");
         TxtAboutSub.Text = L.T("about.subtitle");
@@ -238,6 +242,7 @@ public sealed partial class SettingsPage : UserControl
 
             WidthBox.Value = _app.WindowWidth;
             HeightBox.Value = _app.WindowHeight;
+            AdaptiveSwitch.IsOn = _app.AdaptivePoll;
 
             VersionText.Text = L.F("update.versionLine",
                 UpdateService.CurrentVersion, UpdateChecker.Owner, UpdateChecker.Repo);
@@ -606,6 +611,19 @@ public sealed partial class SettingsPage : UserControl
     {
         if (_loading) return;
         if (QuietSwitch.IsOn) ApplyAlert();
+    }
+
+    // ------------------------------------------------------------------
+    // 自适应轮询(1.6.0)
+    // ------------------------------------------------------------------
+
+    private void AdaptiveSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _app.SetAdaptivePoll(AdaptiveSwitch.IsOn);
+        _app.TrySaveCfg();
+        // 重建循环让新节奏立刻生效(不等到原周期到点)
+        _app.Poller.Reschedule();
     }
 
     // ------------------------------------------------------------------

@@ -119,6 +119,10 @@ public static class L
         ["adv.width"] = "宽",
         ["adv.height"] = "高",
         ["adv.resetSize"] = "恢复默认 420×560",
+        ["adv.adaptive.title"] = "自适应轮询",
+        ["adv.adaptive.subtitle"] = "有紧张行时加密轮询(最快 30 秒),持续失败时退避",
+        ["adv.adaptive.on"] = "已启用",
+        ["adv.adaptive.off"] = "已关闭",
 
         // —— 设置页:关于软件 ——
         ["about.title"] = "关于软件",
@@ -150,6 +154,7 @@ public static class L
         ["ov.error"] = "错误",
         ["ov.resume"] = "恢复轮询",
         ["ov.pause"] = "暂停此 provider",
+        ["ov.ctxRefresh"] = "立即刷新",
 
         // —— 热键状态(设置页回显/弹窗) ——
         ["hotkey.svcDown"] = "热键服务不可用",
@@ -469,6 +474,10 @@ public static class L
         ["adv.width"] = "Width",
         ["adv.height"] = "Height",
         ["adv.resetSize"] = "Reset to 420×560",
+        ["adv.adaptive.title"] = "Adaptive polling",
+        ["adv.adaptive.subtitle"] = "Poll faster when a row runs low (min 30s); back off when things keep failing",
+        ["adv.adaptive.on"] = "On",
+        ["adv.adaptive.off"] = "Off",
 
         // —— Settings: about ——
         ["about.title"] = "About",
@@ -500,6 +509,7 @@ public static class L
         ["ov.error"] = "Error",
         ["ov.resume"] = "Resume polling",
         ["ov.pause"] = "Pause this provider",
+        ["ov.ctxRefresh"] = "Refresh now",
 
         // —— hotkey status (settings echo / dialog) ——
         ["hotkey.svcDown"] = "Hotkey service unavailable",
