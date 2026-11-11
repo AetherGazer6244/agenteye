@@ -104,6 +104,10 @@ public sealed class ConfigStore
             ["enable"] = true,
             ["warn_pct"] = 30,
             ["critical_amount_yuan"] = 5.0,
+            // 免打扰时段(1.6.0):"HH:mm",空串 = 关闭;ui/alert 自由键,
+            // schema_version 仍为 2,Python 版 merge 保留未知键
+            ["quiet_start"] = "",
+            ["quiet_end"] = "",
         },
         ["ui"] = new Dictionary<string, object?>
         {

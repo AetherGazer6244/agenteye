@@ -113,6 +113,12 @@ public sealed partial class SettingsPage : UserControl
         TxtWarnPctSuffix.Text = L.T("alert.warnPctSuffix");
         TxtCritAmount.Text = L.T("alert.critAmount");
         TxtCritSuffix.Text = L.T("alert.critSuffix");
+        TxtQuietTitle.Text = L.T("alert.quiet.title");
+        TxtQuietSub.Text = L.T("alert.quiet.subtitle");
+        QuietSwitch.OnContent = L.T("alert.quiet.on");
+        QuietSwitch.OffContent = L.T("alert.quiet.off");
+        TxtQuietStart.Text = L.T("alert.quiet.startLabel");
+        TxtQuietEnd.Text = L.T("alert.quiet.endLabel");
         SecApi.Text = L.T("sec.api");
         TxtKeysLabel.Text = L.T("api.keysLabel");
         BtnAddKey.Content = L.T("api.addKey");
@@ -224,6 +230,11 @@ public sealed partial class SettingsPage : UserControl
             WarnPctBox.Value = alert.TryGetValue("warn_pct", out var w) ? Convert.ToDouble(w) : 30;
             CriticalYuanBox.Value = alert.TryGetValue("critical_amount_yuan", out var c)
                 ? Convert.ToDouble(c) : 5.0;
+            // 免打扰(1.6.0):两个键都能解析才算开;缺省 23:00–08:00
+            QuietSwitch.IsOn = QuietConfigured(alert);
+            QuietStartPicker.Time = QuietTimeOr(alert, "quiet_start", fallbackMinutes: 23 * 60);
+            QuietEndPicker.Time = QuietTimeOr(alert, "quiet_end", fallbackMinutes: 8 * 60);
+            SyncQuietTimes();
 
             WidthBox.Value = _app.WindowWidth;
             HeightBox.Value = _app.WindowHeight;
@@ -548,7 +559,53 @@ public sealed partial class SettingsPage : UserControl
         alert["enable"] = AlertEnable.IsOn;
         alert["warn_pct"] = (int)Math.Clamp(WarnPctBox.Value, 0, 100);
         alert["critical_amount_yuan"] = Math.Max(0, CriticalYuanBox.Value);
+        // 免打扰(1.6.0):开 = 落 "HH:mm";关 = 置空串(与模板缺省一致)
+        if (QuietSwitch.IsOn)
+        {
+            alert["quiet_start"] = QuietText(QuietStartPicker.Time);
+            alert["quiet_end"] = QuietText(QuietEndPicker.Time);
+        }
+        else
+        {
+            alert["quiet_start"] = "";
+            alert["quiet_end"] = "";
+        }
         _app.TrySaveCfg();
+    }
+
+    // ------------------------------------------------------------------
+    // 告警免打扰时段(1.6.0)
+    // ------------------------------------------------------------------
+
+    /// <summary>两个 quiet 键都能解析出时间才视为「已配置」。</summary>
+    private static bool QuietConfigured(Dictionary<string, object?> alert) =>
+        AgentEye.Core.Alerts.QuietHours.ParseMinutes(alert.TryGetValue("quiet_start", out var s) ? s as string : null)
+            is not null &&
+        AgentEye.Core.Alerts.QuietHours.ParseMinutes(alert.TryGetValue("quiet_end", out var e) ? e as string : null)
+            is not null;
+
+    /// <summary>quiet 键 → TimeSpan;没配给缺省值(开始 23:00 / 结束 08:00)。</summary>
+    private static TimeSpan QuietTimeOr(Dictionary<string, object?> alert, string key, int fallbackMinutes) =>
+        TimeSpan.FromMinutes(AgentEye.Core.Alerts.QuietHours.ParseMinutes(
+            alert.TryGetValue(key, out var v) ? v as string : null) ?? fallbackMinutes);
+
+    private static string QuietText(TimeSpan time) =>
+        $"{(int)time.TotalHours:D2}:{time.Minutes:D2}";
+
+    private void SyncQuietTimes() =>
+        QuietTimes.Visibility = QuietSwitch.IsOn ? Visibility.Visible : Visibility.Collapsed;
+
+    private void QuietSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        SyncQuietTimes();
+        if (_loading) return;
+        ApplyAlert();
+    }
+
+    private void QuietTime_Changed(TimePicker sender, TimePickerSelectedValueChangedEventArgs args)
+    {
+        if (_loading) return;
+        if (QuietSwitch.IsOn) ApplyAlert();
     }
 
     // ------------------------------------------------------------------

@@ -214,6 +214,34 @@
                                             ValueChanged="AlertNum_Changed" />
                             <TextBlock Grid.Column="2" x:Name="TxtCritSuffix" VerticalAlignment="Center" />
                         </Grid>
+                        <!-- 免打扰时段(1.6.0):开关 + 起止时间,alert 关时随阈值一起收纳 -->
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtQuietTitle"
+                                           Style="{StaticResource AeSettingsItemTitleStyle}" />
+                                <TextBlock x:Name="TxtQuietSub"
+                                           Style="{StaticResource AeSettingsItemSubtitleStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="QuietSwitch" Grid.Column="1" MinWidth="0"
+                                          VerticalAlignment="Center"
+                                          Toggled="QuietSwitch_Toggled" />
+                        </Grid>
+                        <StackPanel x:Name="QuietTimes" Orientation="Horizontal" Spacing="8"
+                                    Visibility="Collapsed">
+                            <TextBlock x:Name="TxtQuietStart" VerticalAlignment="Center" />
+                            <TimePicker x:Name="QuietStartPicker" ClockIdentifier="24HourClock"
+                                        MinuteIncrement="30" MinWidth="110"
+                                        SelectedTimeChanged="QuietTime_Changed" />
+                            <TextBlock x:Name="TxtQuietEnd" VerticalAlignment="Center" />
+                            <TimePicker x:Name="QuietEndPicker" ClockIdentifier="24HourClock"
+                                        MinuteIncrement="30" MinWidth="110"
+                                        SelectedTimeChanged="QuietTime_Changed" />
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </Border>

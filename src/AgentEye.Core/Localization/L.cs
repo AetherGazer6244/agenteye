@@ -173,6 +173,18 @@ public static class L
         ["notify.titleOne"] = "{0} 额度告警",
         ["notify.titleMany"] = "{0} 个 provider 额度告警",
         ["notify.body"] = "剩 {0}% · {1}",
+        ["notify.recoverTitleOne"] = "「{0}」额度已恢复",
+        ["notify.recoverTitleMany"] = "{0} 个 provider 额度已恢复",
+        ["notify.errorTitleOne"] = "{0} 连续拉取失败",
+        ["notify.errorTitleMany"] = "{0} 个 provider 连续拉取失败",
+
+        // —— 设置页:告警免打扰(1.6.0) ——
+        ["alert.quiet.title"] = "免打扰时段",
+        ["alert.quiet.subtitle"] = "该时段内只记录不弹通知(跨午夜也可)",
+        ["alert.quiet.on"] = "已启用",
+        ["alert.quiet.off"] = "已关闭",
+        ["alert.quiet.startLabel"] = "开始",
+        ["alert.quiet.endLabel"] = "结束",
 
         // —— 设置页弹窗/错误 ——
         ["autostart.errorTitle"] = "无法设置开机自启动",
@@ -511,6 +523,18 @@ public static class L
         ["notify.titleOne"] = "{0} balance alert",
         ["notify.titleMany"] = "{0} providers low on balance",
         ["notify.body"] = "{0}% left · {1}",
+        ["notify.recoverTitleOne"] = "\"{0}\" balance recovered",
+        ["notify.recoverTitleMany"] = "{0} providers recovered",
+        ["notify.errorTitleOne"] = "{0} keeps failing",
+        ["notify.errorTitleMany"] = "{0} providers keep failing",
+
+        // —— Settings: alert quiet hours (1.6.0) ——
+        ["alert.quiet.title"] = "Quiet hours",
+        ["alert.quiet.subtitle"] = "Record only, no toasts during this window (overnight ranges work)",
+        ["alert.quiet.on"] = "On",
+        ["alert.quiet.off"] = "Off",
+        ["alert.quiet.startLabel"] = "From",
+        ["alert.quiet.endLabel"] = "Until",
 
         // —— settings dialogs / errors ——
         ["autostart.errorTitle"] = "Can't change the startup setting",
